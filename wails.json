@@ -7,13 +7,13 @@
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
-    "name": "EC2 Shell Desk Contributors"
+    "name": "Andrey3681"
   },
   "info": {
-    "companyName": "EC2 Shell Desk",
+    "companyName": "Andrey3681",
     "productName": "EC2 Shell Desk",
     "productVersion": "0.1.0",
-    "copyright": "Copyright (c) 2026 EC2 Shell Desk",
+    "copyright": "Copyright (c) 2026 Andrey3681. All Rights Reserved.",
     "comments": "Lightweight Windows SSH + SFTP Desktop Client for EC2 and Linux VMs"
   }
 }

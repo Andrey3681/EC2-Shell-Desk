@@ -70,3 +70,10 @@ El backend en Go sigue **Arquitectura Hexagonal (Puertos y Adaptadores)** separa
 - [`docs/verificacion.md`](docs/verificacion.md) — Estrategia de pruebas unitarias, integración y manuales
 - [`docs/TODO.md`](docs/TODO.md) — Hoja de ruta y lista de verificación por fases
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — Flujo Git, Conventional Commits y estándares de código
+
+## Licencia
+
+Este proyecto es **Source-Available (Uso No Comercial)** — **Todos los derechos reservados a [Andrey3681](https://github.com/Andrey3681)**.
+
+- El código fuente es público para consulta y uso **estrictamente personal, educativo o sin ánimo de lucro**.
+- Queda prohibido el uso comercial, la venta, monetización o redistribución sin autorización previa y por escrito del autor. Consulta [`LICENSE`](LICENSE) para conocer los términos completos.

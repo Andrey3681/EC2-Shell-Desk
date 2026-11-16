@@ -1,0 +1,45 @@
+EC2 Shell Desk — Source-Available Non-Commercial License
+Copyright (c) 2026 Andrey3681 (https://github.com/Andrey3681/EC2-Shell-Desk)
+All Rights Reserved.
+
+1. Definitions
+   "Software" means the source code, documentation, binaries, installers,
+   and associated files of the EC2 Shell Desk project.
+   "Author" means Andrey3681, the sole copyright and rights holder.
+
+2. Permitted Non-Commercial Use
+   You are granted a limited, non-exclusive, revocable, non-transferable
+   permission to view, clone, compile, and run the Software solely for your
+   personal, educational, or strictly non-commercial purposes, provided that
+   this copyright notice and license text are preserved in full.
+
+3. Prohibited Uses (Prior Written Authorization Required)
+   Unless you obtain explicit, prior written authorization from the Author:
+   (a) No Commercial Use: You may NOT use the Software in connection with any
+       commercial, for-profit, business, or revenue-generating activity,
+       product, or internal enterprise service.
+   (b) No Monetization or Resale: You may NOT sell, sublicense, rent, lease,
+       monetize, or distribute the Software (in source or compiled form) for
+       a fee or commercial advantage.
+   (c) No Unauthorized Redistribution: You may NOT redistribute modified or
+       unmodified copies, installers, or derivative works of the Software to
+       third parties, nor publish rebranded builds as your own product.
+
+4. Exclusive Rights Reserved to the Author
+   All title, ownership, intellectual property rights, commercial rights,
+   and redistribution rights in and to the Software remain exclusively with
+   Andrey3681. Only the Author is permitted to grant commercial licenses,
+   authorize redistribution, or release official distributions of the Software.
+
+5. Contributions
+   By submitting a pull request or contribution to this repository, you agree
+   that your contribution is governed by this License and may be used,
+   modified, and distributed by the Author under any terms chosen by the
+   Author.
+
+6. Disclaimer of Warranty & Limitation of Liability
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM
+   THE USE OR INABILITY TO USE THE SOFTWARE.
