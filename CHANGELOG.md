@@ -1,0 +1,17 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- Initial repository structure following Hexagonal Architecture (`cmd/desktop`, `internal/core`, `internal/services`, `internal/adapters`, `internal/app`) and Wails v2 frontend skeleton.
+- AI agent governance (`AGENTS.md`), modular rules (`.agents/rules/`), and domain skills (`.agents/skills/`).
+- Tooling and quality configuration (`Taskfile.yml`, `.golangci.yml`, `.gomarkdoc.yml`, `lefthook.yml`, `wails.json`, Windows scripts, and GitHub Actions CI workflow).
+- Architecture, solution design, vault security, UI/UX, verification documentation, and PlantUML diagrams under `docs/`.
+- Phase 2 core domain entities and sentinel errors (`internal/core/domain`), hexagonal port interfaces (`internal/core/ports`), Argon2id + AES-256-GCM vault cryptography adapter (`internal/adapters/crypto`), pure-Go SQLite persistence with embedded migrations and strict `owner_user_id` isolation (`internal/adapters/sqlite`), and application services (`AuthService`, `VaultService`, `HostService`) with unit and end-to-end multi-user isolation tests.
+- Phase 3 SSH, SFTP, and local Windows filesystem engines: `internal/adapters/sshclient` (PEM/OpenSSH auth, `.ppk` rejection, TOFU host key verification callback, interactive PTY, resize, keepalive), `internal/adapters/sftpclient` (`pkg/sftp` directory ops and cancelable chunked uploads/downloads), `internal/adapters/winfs` (Windows drive roots and local directory browsing), `SessionService`, `TransferService`, and embedded Go SSH/SFTP server integration tests.
+- Phase 4 Wails v2 desktop integration and UI: `internal/app/*_handler.go` bindings and `EventBridge`, `cmd/desktop/bootstrap` DI wiring, Vite + TypeScript + `xterm.js` desktop UI (`AuthView`, `InstanceSidebar`, `HostModal`, `KeyVaultModal`, `TofuModal`, `TerminalTabsManager`, `XftpDualPane`), bilingual `es`/`en` i18n, and Windows `.exe` packaging via `task build`.

@@ -1,0 +1,65 @@
+version: "3"
+
+vars:
+  APP_NAME: ec2-shell-desk
+  PKGS: ./...
+
+tasks:
+  doctor:
+    desc: Verify Windows development tools (Go, Wails, Node, WebView2, NSIS, linters)
+    cmd: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-doctor.ps1
+
+  setup-frontend:
+    desc: Install frontend Node.js dependencies
+    dir: frontend
+    cmd: powershell -NoProfile -Command "if (Test-Path package-lock.json) { npm ci } else { npm install }"
+
+  setup:
+    desc: Download Go/Frontend dependencies and install quality tools
+    cmds:
+      - go mod download
+      - task: setup-frontend
+      - go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      - go install mvdan.cc/gofumpt@latest
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install github.com/princjef/gomarkdoc/cmd/gomarkdoc@latest
+
+  dev:
+    desc: Start the desktop application in development mode with hot-reload
+    cmd: wails dev
+
+  fmt:
+    desc: Format Go code with strict gofumpt rules
+    cmd: gofumpt -l -w .
+
+  lint:
+    desc: Run static analysis on Go packages with golangci-lint
+    cmd: golangci-lint run {{.PKGS}}
+
+  test:
+    desc: Run Go unit and integration test suites (with -race when CGO_ENABLED=1)
+    cmds:
+      - task: fmt
+      - powershell -NoProfile -Command "if ((go env CGO_ENABLED) -eq '1') { go test {{.PKGS}} -race -cover -count=1 } else { go test {{.PKGS}} -cover -count=1 }"
+
+  doc:
+    desc: Regenerate Go API Markdown documentation and PlantUML diagrams
+    cmds:
+      - gomarkdoc ./internal/...
+      - powershell -NoProfile -Command "if (Get-Command plantuml -ErrorAction SilentlyContinue) { plantuml -tpng docs/diagramas/*.puml } else { Write-Host 'PlantUML not installed; skipping PNG export.' -ForegroundColor Yellow }"
+
+  check:
+    desc: Run full pre-commit validation (format + lint + tests + docs)
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
+      - task: doc
+
+  build:
+    desc: Build portable Windows desktop executable (.exe)
+    cmd: wails build -platform windows/amd64
+
+  build-installer:
+    desc: Build Windows executable and NSIS installer
+    cmd: wails build -platform windows/amd64 -nsis

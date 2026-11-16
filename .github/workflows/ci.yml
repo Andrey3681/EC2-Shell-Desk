@@ -1,0 +1,65 @@
+name: Windows CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Format, Lint, Test & Build (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Go quality tools and Wails CLI
+        run: |
+          go install mvdan.cc/gofumpt@latest
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Check Go formatting (gofumpt)
+        shell: pwsh
+        run: |
+          $unformatted = gofumpt -l .
+          if ($unformatted) {
+            Write-Host "Unformatted Go files:"
+            $unformatted
+            exit 1
+          }
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      - name: Run Go vet and tests with race detector
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          go vet ./...
+          go test ./... -race -cover -count=1
+
+      - name: Install frontend dependencies and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build Windows desktop executable (Wails v2)
+        run: wails build -m -platform windows/amd64

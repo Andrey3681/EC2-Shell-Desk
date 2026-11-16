@@ -1,0 +1,6 @@
+# gomarkdoc configuration for generating API documentation into docs/api/
+output: "docs/api/{{.Dir}}.md"
+format: github
+repository:
+  url: https://github.com/Andrey3681/EC2-Shell-Desk
+  defaultBranch: main

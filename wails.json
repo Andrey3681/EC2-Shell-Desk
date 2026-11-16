@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "ec2-shell-desk",
+  "outputfilename": "ec2-shell-desk",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "EC2 Shell Desk Contributors"
+  },
+  "info": {
+    "companyName": "EC2 Shell Desk",
+    "productName": "EC2 Shell Desk",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright (c) 2026 EC2 Shell Desk",
+    "comments": "Lightweight Windows SSH + SFTP Desktop Client for EC2 and Linux VMs"
+  }
+}

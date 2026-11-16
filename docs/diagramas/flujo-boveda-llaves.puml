@@ -1,0 +1,31 @@
+@startuml flujo-boveda-llaves
+!theme plain
+title Flujo de Autenticacion y Cifrado de Boveda por Usuario
+
+actor Usuario
+participant "UI Auth / Vault" as UI
+participant "AuthService / VaultService" as Svc
+participant "CryptoAdapter\n(Argon2id + AES-256-GCM)" as Crypto
+database "SQLite Local\n(vault.db)" as DB
+
+== Login y Desbloqueo de Clave Maestra ==
+Usuario -> UI: Ingresa username y password
+UI -> Svc: Login(username, password)
+Svc -> DB: GetUserByUsername(username)
+DB --> Svc: User(password_hash, auth_salt, vault_salt)
+Svc -> Crypto: VerifyPassword(password, auth_salt, password_hash)
+Crypto --> Svc: OK
+Svc -> Crypto: DeriveMasterKey(password, vault_salt)
+Crypto --> Svc: masterKey (32 bytes en RAM)
+Svc --> UI: Sesion desbloqueada (activeUserID)
+
+== Importacion de Llave .pem ==
+Usuario -> UI: Selecciona archivo .pem + nombre
+UI -> Svc: ImportKey(activeUserID, name, rawPEM, passphrase)
+Svc -> Crypto: Encrypt(masterKey, rawPEM, AAD=userID:keyID)
+Crypto --> Svc: encryptedPEM (nonce + ciphertext + tag)
+Svc -> DB: SaveSSHKey(id, owner_user_id, name, fingerprint, encrypted_pem)
+DB --> Svc: OK
+Svc --> UI: Llave guardada de forma segura
+
+@enduml

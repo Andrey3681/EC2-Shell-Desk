@@ -1,0 +1,44 @@
+@startuml flujo-ssh-sftp
+!theme plain
+title Flujo de Conexion SSH (PTY) y Transferencia SFTP (Xftp)
+
+actor Usuario
+participant "Frontend\n(xterm.js + Xftp)" as UI
+participant "SessionService\n& TransferService" as Svc
+participant "SSH / SFTP\nAdapters" as Net
+participant "Instancia EC2\n(Linux OpenSSH)" as EC2
+
+== Conexion SSH + Verificacion TOFU ==
+Usuario -> UI: Doble clic en instancia EC2
+UI -> Svc: OpenSession(userID, hostID, cols, rows)
+Svc -> Net: Connect(host, decryptedKey, tofuCallback)
+Net -> EC2: Handshake SSH (:22)
+EC2 --> Net: Host Public Key
+Net -> Svc: Verificar huella en known_hosts (userID)
+alt Host desconocido (TOFU)
+  Svc --> UI: Solicitar confirmacion de huella SHA-256
+  Usuario -> UI: Confirma confiar en el host
+  UI -> Svc: TrustHostKey(...)
+end
+Net -> EC2: OpenPTY(xterm-256color) + Shell()
+Net --> Svc: SessionHandle (stdin, stdout, resize)
+Svc --> UI: sessionID activa
+
+== Streaming Terminal ==
+loop mientras sesion este activa
+  Net -> EC2: Stdin / WindowChange
+  EC2 --> Net: Stdout / Stderr ANSI
+  Net --> UI: EventsEmit("terminal:data:<sessionID>")
+end
+
+== Transferencia SFTP ==
+Usuario -> UI: Subir documento Windows -> EC2
+UI -> Svc: UploadFile(sessionID, localPath, remotePath)
+Svc -> Net: Stream chunks con context.Context
+loop bloques 64KB
+  Net -> EC2: SFTP Write Chunk
+  Svc --> UI: EventsEmit("sftp:progress", bytes, total)
+end
+Svc --> UI: Transferencia completada
+
+@enduml

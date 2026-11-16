@@ -1,0 +1,85 @@
+@startuml arquitectura-hexagonal
+!theme plain
+title EC2 Shell Desk - Arquitectura Hexagonal (Wails v2 + Go)
+
+package "Frontend Desktop (WebView2)" {
+  [TypeScript + Vite + xterm.js] as UI
+  [Wails Bindings & Events] as IPC
+  UI --> IPC
+}
+
+package "Driving Adapters (internal/app)" {
+  [AuthHandler]
+  [HostHandler]
+  [KeyHandler]
+  [TerminalHandler]
+  [SFTPHandler]
+}
+
+package "Application Services (internal/services)" {
+  [AuthService]
+  [VaultService]
+  [HostService]
+  [SessionService]
+  [TransferService]
+}
+
+package "Core Hexagon (internal/core)" {
+  package "ports" {
+    interface UserRepository
+    interface KeyRepository
+    interface HostRepository
+    interface KeyEncryptor
+    interface PasswordHasher
+    interface SSHSessionManager
+    interface SFTPClient
+    interface LocalFileSystem
+  }
+  package "domain" {
+    [User]
+    [SSHKey]
+    [HostInstance]
+    [FileEntry]
+    [TransferTask]
+  }
+}
+
+package "Driven Adapters (internal/adapters)" {
+  [sqlite (modernc.org/sqlite)] as SQLite
+  [crypto (Argon2id + AES-256-GCM)] as Crypto
+  [sshclient (x/crypto/ssh)] as SSH
+  [sftpclient (pkg/sftp)] as SFTP
+  [winfs (Windows Disk)] as WinFS
+}
+
+IPC --> [AuthHandler]
+IPC --> [HostHandler]
+IPC --> [KeyHandler]
+IPC --> [TerminalHandler]
+IPC --> [SFTPHandler]
+
+[AuthHandler] --> [AuthService]
+[HostHandler] --> [HostService]
+[KeyHandler] --> [VaultService]
+[TerminalHandler] --> [SessionService]
+[SFTPHandler] --> [TransferService]
+
+[AuthService] --> UserRepository
+[AuthService] --> PasswordHasher
+[VaultService] --> KeyRepository
+[VaultService] --> KeyEncryptor
+[HostService] --> HostRepository
+[SessionService] --> SSHSessionManager
+[TransferService] --> SFTPClient
+[TransferService] --> LocalFileSystem
+
+SQLite ..|> UserRepository
+SQLite ..|> KeyRepository
+SQLite ..|> HostRepository
+Crypto ..|> KeyEncryptor
+Crypto ..|> PasswordHasher
+SSH ..|> SSHSessionManager
+SFTP ..|> SFTPClient
+WinFS ..|> LocalFileSystem
+
+@enduml
