@@ -124,3 +124,43 @@ func TestProjectionsStripSecrets(t *testing.T) {
 		t.Fatalf("unexpected key summary: %+v", summary)
 	}
 }
+
+func TestSSHTunnelValidate(t *testing.T) {
+	valid := domain.SSHTunnel{
+		ID:          "tun-1",
+		OwnerUserID: "user-1",
+		HostID:      "host-1",
+		Name:        "RDS Prod Postgres",
+		Preset:      domain.TunnelPresetPostgreSQL,
+		LocalHost:   domain.DefaultTunnelLocalHost,
+		LocalPort:   15432,
+		RemoteHost:  "mydb.abc123.us-east-1.rds.amazonaws.com",
+		RemotePort:  5432,
+	}
+
+	tests := []struct {
+		name    string
+		mutate  func(tun *domain.SSHTunnel)
+		wantErr error
+	}{
+		{name: "valid tunnel", mutate: func(_ *domain.SSHTunnel) {}, wantErr: nil},
+		{name: "missing owner", mutate: func(tun *domain.SSHTunnel) { tun.OwnerUserID = "" }, wantErr: domain.ErrInvalidInput},
+		{name: "missing host", mutate: func(tun *domain.SSHTunnel) { tun.HostID = "" }, wantErr: domain.ErrInvalidInput},
+		{name: "empty name", mutate: func(tun *domain.SSHTunnel) { tun.Name = " " }, wantErr: domain.ErrInvalidInput},
+		{name: "unsupported preset", mutate: func(tun *domain.SSHTunnel) { tun.Preset = "oracle" }, wantErr: domain.ErrInvalidInput},
+		{name: "local port zero", mutate: func(tun *domain.SSHTunnel) { tun.LocalPort = 0 }, wantErr: domain.ErrInvalidInput},
+		{name: "remote host whitespace", mutate: func(tun *domain.SSHTunnel) { tun.RemoteHost = "bad host" }, wantErr: domain.ErrInvalidInput},
+		{name: "remote port out of range", mutate: func(tun *domain.SSHTunnel) { tun.RemotePort = 70000 }, wantErr: domain.ErrInvalidInput},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tun := valid
+			tc.mutate(&tun)
+			err := tun.Validate()
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("Validate() error = %v, want %v", err, tc.wantErr)
+			}
+		})
+	}
+}

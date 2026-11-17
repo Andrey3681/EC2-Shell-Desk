@@ -42,3 +42,13 @@ type KnownHostRepository interface {
 	ListByUser(ctx context.Context, ownerUserID string) ([]domain.KnownHost, error)
 	Delete(ctx context.Context, ownerUserID, knownHostID string) error
 }
+
+// TunnelRepository persists SSH port-forwarding tunnel definitions scoped strictly by owner user ID.
+type TunnelRepository interface {
+	Create(ctx context.Context, tunnel domain.SSHTunnel) error
+	GetByID(ctx context.Context, ownerUserID, tunnelID string) (domain.SSHTunnel, error)
+	ListByUser(ctx context.Context, ownerUserID string) ([]domain.SSHTunnel, error)
+	Update(ctx context.Context, tunnel domain.SSHTunnel) error
+	Delete(ctx context.Context, ownerUserID, tunnelID string) error
+	CountByHost(ctx context.Context, ownerUserID, hostID string) (int, error)
+}

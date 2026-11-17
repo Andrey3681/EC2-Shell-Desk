@@ -11,7 +11,7 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
 ## Index
 
 - [type AuthHandler](<#AuthHandler>)
-  - [func NewAuthHandler\(bridge \*EventBridge, auth \*services.AuthService, sessions \*services.SessionService, transfers \*services.TransferService\) \*AuthHandler](<#NewAuthHandler>)
+  - [func NewAuthHandler\(bridge \*EventBridge, auth \*services.AuthService, sessions \*services.SessionService, transfers \*services.TransferService, tunnels \*services.TunnelService\) \*AuthHandler](<#NewAuthHandler>)
   - [func \(h \*AuthHandler\) BootstrapInitialUser\(username, password string\) \(domain.UserProfile, error\)](<#AuthHandler.BootstrapInitialUser>)
   - [func \(h \*AuthHandler\) CreateUser\(username, password string\) \(domain.UserProfile, error\)](<#AuthHandler.CreateUser>)
   - [func \(h \*AuthHandler\) ListUsers\(\) \(\[\]domain.UserProfile, error\)](<#AuthHandler.ListUsers>)
@@ -25,6 +25,7 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
   - [func \(b \*EventBridge\) OnTerminalClosed\(sessionID, reason string\)](<#EventBridge.OnTerminalClosed>)
   - [func \(b \*EventBridge\) OnTerminalData\(sessionID string, data \[\]byte\)](<#EventBridge.OnTerminalData>)
   - [func \(b \*EventBridge\) OnTransferProgress\(task domain.TransferTask\)](<#EventBridge.OnTransferProgress>)
+  - [func \(b \*EventBridge\) OnTunnelStatusChanged\(status domain.TunnelRuntimeStatus\)](<#EventBridge.OnTunnelStatusChanged>)
   - [func \(b \*EventBridge\) RequestTOFUTrust\(ctx context.Context, challenge ports.HostKeyChallenge\) \(bool, error\)](<#EventBridge.RequestTOFUTrust>)
   - [func \(b \*EventBridge\) ResolveTOFU\(requestID string, trusted bool\) error](<#EventBridge.ResolveTOFU>)
   - [func \(b \*EventBridge\) SetContext\(ctx context.Context\)](<#EventBridge.SetContext>)
@@ -72,10 +73,19 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
   - [func \(h \*TerminalHandler\) ResizeTerminal\(sessionID string, cols, rows int\) error](<#TerminalHandler.ResizeTerminal>)
   - [func \(h \*TerminalHandler\) RespondTOFU\(requestID string, trusted bool\) error](<#TerminalHandler.RespondTOFU>)
   - [func \(h \*TerminalHandler\) WriteTerminal\(sessionID, data string\) error](<#TerminalHandler.WriteTerminal>)
+- [type TunnelHandler](<#TunnelHandler>)
+  - [func NewTunnelHandler\(bridge \*EventBridge, tunnels \*services.TunnelService\) \*TunnelHandler](<#NewTunnelHandler>)
+  - [func \(h \*TunnelHandler\) CreateTunnel\(input services.SaveTunnelInput\) \(domain.SSHTunnel, error\)](<#TunnelHandler.CreateTunnel>)
+  - [func \(h \*TunnelHandler\) DeleteTunnel\(tunnelID string\) error](<#TunnelHandler.DeleteTunnel>)
+  - [func \(h \*TunnelHandler\) ListStatuses\(\) \(\[\]domain.TunnelRuntimeStatus, error\)](<#TunnelHandler.ListStatuses>)
+  - [func \(h \*TunnelHandler\) ListTunnels\(\) \(\[\]domain.SSHTunnel, error\)](<#TunnelHandler.ListTunnels>)
+  - [func \(h \*TunnelHandler\) StartTunnel\(tunnelID, passwordFallback string\) \(domain.TunnelRuntimeStatus, error\)](<#TunnelHandler.StartTunnel>)
+  - [func \(h \*TunnelHandler\) StopTunnel\(tunnelID string\) error](<#TunnelHandler.StopTunnel>)
+  - [func \(h \*TunnelHandler\) UpdateTunnel\(input services.SaveTunnelInput\) \(domain.SSHTunnel, error\)](<#TunnelHandler.UpdateTunnel>)
 
 
 <a name="AuthHandler"></a>
-## type [AuthHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L19-L24>)
+## type [AuthHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L19-L25>)
 
 AuthHandler exposes local authentication and multi\-user session lifecycle bindings to Wails.
 
@@ -86,16 +96,16 @@ type AuthHandler struct {
 ```
 
 <a name="NewAuthHandler"></a>
-### func [NewAuthHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L27-L32>)
+### func [NewAuthHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L28-L34>)
 
 ```go
-func NewAuthHandler(bridge *EventBridge, auth *services.AuthService, sessions *services.SessionService, transfers *services.TransferService) *AuthHandler
+func NewAuthHandler(bridge *EventBridge, auth *services.AuthService, sessions *services.SessionService, transfers *services.TransferService, tunnels *services.TunnelService) *AuthHandler
 ```
 
 NewAuthHandler constructs an AuthHandler wired to authentication and active session lifecycles.
 
 <a name="AuthHandler.BootstrapInitialUser"></a>
-### func \(\*AuthHandler\) [BootstrapInitialUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L68>)
+### func \(\*AuthHandler\) [BootstrapInitialUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L71>)
 
 ```go
 func (h *AuthHandler) BootstrapInitialUser(username, password string) (domain.UserProfile, error)
@@ -104,7 +114,7 @@ func (h *AuthHandler) BootstrapInitialUser(username, password string) (domain.Us
 BootstrapInitialUser creates the first local user and unlocks their encrypted vault.
 
 <a name="AuthHandler.CreateUser"></a>
-### func \(\*AuthHandler\) [CreateUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L73>)
+### func \(\*AuthHandler\) [CreateUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L76>)
 
 ```go
 func (h *AuthHandler) CreateUser(username, password string) (domain.UserProfile, error)
@@ -113,7 +123,7 @@ func (h *AuthHandler) CreateUser(username, password string) (domain.UserProfile,
 CreateUser registers an additional isolated local user account.
 
 <a name="AuthHandler.ListUsers"></a>
-### func \(\*AuthHandler\) [ListUsers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L63>)
+### func \(\*AuthHandler\) [ListUsers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L66>)
 
 ```go
 func (h *AuthHandler) ListUsers() ([]domain.UserProfile, error)
@@ -122,16 +132,16 @@ func (h *AuthHandler) ListUsers() ([]domain.UserProfile, error)
 ListUsers returns safe public profiles for all configured local users.
 
 <a name="AuthHandler.Lock"></a>
-### func \(\*AuthHandler\) [Lock](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L89>)
+### func \(\*AuthHandler\) [Lock](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L95>)
 
 ```go
 func (h *AuthHandler) Lock()
 ```
 
-Lock terminates active SSH/SFTP sessions and wipes the unlocked master key from memory.
+Lock terminates active SSH/SFTP sessions and tunnels and wipes the unlocked master key from memory.
 
 <a name="AuthHandler.Login"></a>
-### func \(\*AuthHandler\) [Login](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L78>)
+### func \(\*AuthHandler\) [Login](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L81>)
 
 ```go
 func (h *AuthHandler) Login(username, password string) (domain.UserProfile, error)
@@ -140,7 +150,7 @@ func (h *AuthHandler) Login(username, password string) (domain.UserProfile, erro
 Login authenticates a user and switches the unlocked vault session, closing prior user sessions first.
 
 <a name="AuthHandler.Status"></a>
-### func \(\*AuthHandler\) [Status](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L42>)
+### func \(\*AuthHandler\) [Status](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L45>)
 
 ```go
 func (h *AuthHandler) Status() (AuthStatus, error)
@@ -217,8 +227,17 @@ func (b *EventBridge) OnTransferProgress(task domain.TransferTask)
 
 OnTransferProgress emits throttled SFTP transfer progress snapshots to the frontend queue.
 
+<a name="EventBridge.OnTunnelStatusChanged"></a>
+### func \(\*EventBridge\) [OnTunnelStatusChanged](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L105>)
+
+```go
+func (b *EventBridge) OnTunnelStatusChanged(status domain.TunnelRuntimeStatus)
+```
+
+OnTunnelStatusChanged emits live SSH tunnel state and traffic updates to the frontend.
+
 <a name="EventBridge.RequestTOFUTrust"></a>
-### func \(\*EventBridge\) [RequestTOFUTrust](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L105>)
+### func \(\*EventBridge\) [RequestTOFUTrust](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L116>)
 
 ```go
 func (b *EventBridge) RequestTOFUTrust(ctx context.Context, challenge ports.HostKeyChallenge) (bool, error)
@@ -227,7 +246,7 @@ func (b *EventBridge) RequestTOFUTrust(ctx context.Context, challenge ports.Host
 RequestTOFUTrust emits a host key fingerprint prompt to the UI and waits for the user's decision.
 
 <a name="EventBridge.ResolveTOFU"></a>
-### func \(\*EventBridge\) [ResolveTOFU](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L148>)
+### func \(\*EventBridge\) [ResolveTOFU](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L159>)
 
 ```go
 func (b *EventBridge) ResolveTOFU(requestID string, trusted bool) error
@@ -656,5 +675,88 @@ func (h *TerminalHandler) WriteTerminal(sessionID, data string) error
 ```
 
 WriteTerminal sends terminal input text from xterm.js to the active PTY session.
+
+<a name="TunnelHandler"></a>
+## type [TunnelHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/tunnel_handler.go#L9-L12>)
+
+TunnelHandler exposes SSH local port\-forwarding tunnel management bindings to Wails.
+
+```go
+type TunnelHandler struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewTunnelHandler"></a>
+### func [NewTunnelHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/tunnel_handler.go#L15>)
+
+```go
+func NewTunnelHandler(bridge *EventBridge, tunnels *services.TunnelService) *TunnelHandler
+```
+
+NewTunnelHandler constructs a TunnelHandler wired to TunnelService.
+
+<a name="TunnelHandler.CreateTunnel"></a>
+### func \(\*TunnelHandler\) [CreateTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/tunnel_handler.go#L28>)
+
+```go
+func (h *TunnelHandler) CreateTunnel(input services.SaveTunnelInput) (domain.SSHTunnel, error)
+```
+
+CreateTunnel validates and stores a new SSH tunnel linked to a user\-owned host instance.
+
+<a name="TunnelHandler.DeleteTunnel"></a>
+### func \(\*TunnelHandler\) [DeleteTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/tunnel_handler.go#L38>)
+
+```go
+func (h *TunnelHandler) DeleteTunnel(tunnelID string) error
+```
+
+DeleteTunnel deletes a stopped SSH tunnel owned by the active user.
+
+<a name="TunnelHandler.ListStatuses"></a>
+### func \(\*TunnelHandler\) [ListStatuses](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/tunnel_handler.go#L58>)
+
+```go
+func (h *TunnelHandler) ListStatuses() ([]domain.TunnelRuntimeStatus, error)
+```
+
+ListStatuses returns runtime status snapshots for active tunnels owned by the active user.
+
+<a name="TunnelHandler.ListTunnels"></a>
+### func \(\*TunnelHandler\) [ListTunnels](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/tunnel_handler.go#L23>)
+
+```go
+func (h *TunnelHandler) ListTunnels() ([]domain.SSHTunnel, error)
+```
+
+ListTunnels returns saved SSH port\-forwarding tunnels owned by the active user.
+
+<a name="TunnelHandler.StartTunnel"></a>
+### func \(\*TunnelHandler\) [StartTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/tunnel_handler.go#L43>)
+
+```go
+func (h *TunnelHandler) StartTunnel(tunnelID, passwordFallback string) (domain.TunnelRuntimeStatus, error)
+```
+
+StartTunnel dials the bastion host with TOFU verification and opens the local TCP tunnel listener.
+
+<a name="TunnelHandler.StopTunnel"></a>
+### func \(\*TunnelHandler\) [StopTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/tunnel_handler.go#L53>)
+
+```go
+func (h *TunnelHandler) StopTunnel(tunnelID string) error
+```
+
+StopTunnel stops an active SSH tunnel owned by the active user.
+
+<a name="TunnelHandler.UpdateTunnel"></a>
+### func \(\*TunnelHandler\) [UpdateTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/tunnel_handler.go#L33>)
+
+```go
+func (h *TunnelHandler) UpdateTunnel(input services.SaveTunnelInput) (domain.SSHTunnel, error)
+```
+
+UpdateTunnel updates a stopped SSH tunnel owned by the active user.
 
 Generated by [gomarkdoc](<https://github.com/princjef/gomarkdoc>)

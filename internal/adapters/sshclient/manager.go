@@ -73,11 +73,7 @@ func NewManager(sftpOpener SFTPOpener, opts ...Option) *Manager {
 
 // ConnectPTY establishes an authenticated SSH connection with TOFU verification and starts an interactive PTY shell.
 func (m *Manager) ConnectPTY(ctx context.Context, req ports.SSHConnectRequest) (ports.PTYSession, error) {
-	if req.VerifyHostKey == nil {
-		return nil, fmt.Errorf("%w: host key verifier callback is required", domain.ErrInvalidInput)
-	}
-
-	authMethods, err := buildAuthMethods(req.PrivateKeyPEM, req.Passphrase, req.Password)
+	client, err := m.dialSSHClient(ctx, req.Host, req.PrivateKeyPEM, req.Passphrase, req.Password, req.VerifyHostKey)
 	if err != nil {
 		return nil, err
 	}
@@ -91,50 +87,6 @@ func (m *Manager) ConnectPTY(ctx context.Context, req ports.SSHConnectRequest) (
 		rows = defaultPTYRows
 	}
 
-	hostPort := net.JoinHostPort(req.Host.HostAddress, strconv.Itoa(req.Host.Port))
-	sshCfg := &ssh.ClientConfig{
-		User:    req.Host.SSHUsername,
-		Auth:    authMethods,
-		Timeout: m.dialTimeout,
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			challenge := ports.HostKeyChallenge{
-				HostAddress:   req.Host.HostAddress,
-				Port:          req.Host.Port,
-				KeyType:       key.Type(),
-				Fingerprint:   ssh.FingerprintSHA256(key),
-				PublicKeyBlob: key.Marshal(),
-			}
-			return req.VerifyHostKey(ctx, challenge)
-		},
-	}
-
-	dialCtx, cancelDial := context.WithTimeout(ctx, m.dialTimeout)
-	defer cancelDial()
-
-	dialer := &net.Dialer{Timeout: m.dialTimeout}
-	netConn, err := dialer.DialContext(dialCtx, "tcp", hostPort)
-	if err != nil {
-		return nil, fmt.Errorf("dial ssh host %s: %w", hostPort, err)
-	}
-
-	// Abort handshake immediately if caller cancels context mid-handshake.
-	handshakeDone := make(chan struct{})
-	go func() {
-		select {
-		case <-dialCtx.Done():
-			_ = netConn.Close()
-		case <-handshakeDone:
-		}
-	}()
-
-	sshConn, chans, reqs, err := ssh.NewClientConn(netConn, hostPort, sshCfg)
-	close(handshakeDone)
-	if err != nil {
-		_ = netConn.Close()
-		return nil, fmt.Errorf("ssh handshake with %s: %w", hostPort, err)
-	}
-
-	client := ssh.NewClient(sshConn, chans, reqs)
 	session, err := client.NewSession()
 	if err != nil {
 		_ = client.Close()
@@ -188,8 +140,70 @@ func (m *Manager) ConnectPTY(ctx context.Context, req ports.SSHConnectRequest) (
 		cancel:     cancelKeepalive,
 	}
 
-	go pty.runKeepalive(sessionCtx, m.keepaliveInterval)
+	go runSSHKeepalive(sessionCtx, client, m.keepaliveInterval)
 	return pty, nil
+}
+
+func (m *Manager) dialSSHClient(
+	ctx context.Context,
+	host domain.HostInstance,
+	privateKeyPEM, passphrase []byte,
+	password string,
+	verifyHostKey ports.HostKeyVerifier,
+) (*ssh.Client, error) {
+	if verifyHostKey == nil {
+		return nil, fmt.Errorf("%w: host key verifier callback is required", domain.ErrInvalidInput)
+	}
+
+	authMethods, err := buildAuthMethods(privateKeyPEM, passphrase, password)
+	if err != nil {
+		return nil, err
+	}
+
+	hostPort := net.JoinHostPort(host.HostAddress, strconv.Itoa(host.Port))
+	sshCfg := &ssh.ClientConfig{
+		User:    host.SSHUsername,
+		Auth:    authMethods,
+		Timeout: m.dialTimeout,
+		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
+			challenge := ports.HostKeyChallenge{
+				HostAddress:   host.HostAddress,
+				Port:          host.Port,
+				KeyType:       key.Type(),
+				Fingerprint:   ssh.FingerprintSHA256(key),
+				PublicKeyBlob: key.Marshal(),
+			}
+			return verifyHostKey(ctx, challenge)
+		},
+	}
+
+	dialCtx, cancelDial := context.WithTimeout(ctx, m.dialTimeout)
+	defer cancelDial()
+
+	dialer := &net.Dialer{Timeout: m.dialTimeout}
+	netConn, err := dialer.DialContext(dialCtx, "tcp", hostPort)
+	if err != nil {
+		return nil, fmt.Errorf("dial ssh host %s: %w", hostPort, err)
+	}
+
+	// Abort handshake immediately if caller cancels context mid-handshake.
+	handshakeDone := make(chan struct{})
+	go func() {
+		select {
+		case <-dialCtx.Done():
+			_ = netConn.Close()
+		case <-handshakeDone:
+		}
+	}()
+
+	sshConn, chans, reqs, err := ssh.NewClientConn(netConn, hostPort, sshCfg)
+	close(handshakeDone)
+	if err != nil {
+		_ = netConn.Close()
+		return nil, fmt.Errorf("ssh handshake with %s: %w", hostPort, err)
+	}
+
+	return ssh.NewClient(sshConn, chans, reqs), nil
 }
 
 func buildAuthMethods(rawPEM, passphrase []byte, password string) ([]ssh.AuthMethod, error) {
@@ -329,7 +343,7 @@ func (s *ptySession) Close() error {
 	return nil
 }
 
-func (s *ptySession) runKeepalive(ctx context.Context, interval time.Duration) {
+func runSSHKeepalive(ctx context.Context, client *ssh.Client, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -338,7 +352,7 @@ func (s *ptySession) runKeepalive(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_, _, err := s.client.SendRequest("keepalive@openssh.com", true, nil)
+			_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
 			if err != nil {
 				return
 			}

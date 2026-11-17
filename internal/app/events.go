@@ -101,6 +101,17 @@ func (b *EventBridge) OnTransferProgress(task domain.TransferTask) {
 	runtime.EventsEmit(ctx, "sftp:progress", task)
 }
 
+// OnTunnelStatusChanged emits live SSH tunnel state and traffic updates to the frontend.
+func (b *EventBridge) OnTunnelStatusChanged(status domain.TunnelRuntimeStatus) {
+	b.mu.RLock()
+	ctx := b.ctx
+	b.mu.RUnlock()
+	if ctx == nil {
+		return
+	}
+	runtime.EventsEmit(ctx, "tunnel:status", status)
+}
+
 // RequestTOFUTrust emits a host key fingerprint prompt to the UI and waits for the user's decision.
 func (b *EventBridge) RequestTOFUTrust(ctx context.Context, challenge ports.HostKeyChallenge) (bool, error) {
 	b.mu.RLock()

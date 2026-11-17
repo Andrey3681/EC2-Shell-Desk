@@ -13,6 +13,7 @@ Package sshclient implements the SSH session manager port with key parsing, TOFU
 - [type Manager](<#Manager>)
   - [func NewManager\(sftpOpener SFTPOpener, opts ...Option\) \*Manager](<#NewManager>)
   - [func \(m \*Manager\) ConnectPTY\(ctx context.Context, req ports.SSHConnectRequest\) \(ports.PTYSession, error\)](<#Manager.ConnectPTY>)
+  - [func \(m \*Manager\) StartLocalForward\(ctx context.Context, req ports.TunnelForwardRequest\) \(ports.TunnelHandle, error\)](<#Manager.StartLocalForward>)
 - [type Option](<#Option>)
   - [func WithDialTimeout\(timeout time.Duration\) Option](<#WithDialTimeout>)
   - [func WithKeepaliveInterval\(interval time.Duration\) Option](<#WithKeepaliveInterval>)
@@ -47,6 +48,15 @@ func (m *Manager) ConnectPTY(ctx context.Context, req ports.SSHConnectRequest) (
 ```
 
 ConnectPTY establishes an authenticated SSH connection with TOFU verification and starts an interactive PTY shell.
+
+<a name="Manager.StartLocalForward"></a>
+### func \(\*Manager\) [StartLocalForward](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/tunnel.go#L24>)
+
+```go
+func (m *Manager) StartLocalForward(ctx context.Context, req ports.TunnelForwardRequest) (ports.TunnelHandle, error)
+```
+
+StartLocalForward establishes an SSH bastion connection and listens on a local TCP port, forwarding each connection to the target remote endpoint over the SSH tunnel.
 
 <a name="Option"></a>
 ## type [Option](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/manager.go#L32>)

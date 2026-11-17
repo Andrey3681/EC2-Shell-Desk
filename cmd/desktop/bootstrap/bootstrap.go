@@ -48,6 +48,7 @@ func Run(assets fs.FS) error {
 	keyRepo := sqlite.NewKeyRepository(store)
 	hostRepo := sqlite.NewHostRepository(store)
 	knownRepo := sqlite.NewKnownHostRepository(store)
+	tunnelRepo := sqlite.NewTunnelRepository(store)
 
 	sshManager := sshclient.NewManager(sftpclient.NewFromSSHClient)
 	localFS := winfs.NewWinFS()
@@ -55,15 +56,17 @@ func Run(assets fs.FS) error {
 
 	authSvc := services.NewAuthService(userRepo, vaultCrypto, vaultCrypto)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vaultCrypto, vaultCrypto)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, tunnelRepo)
 	sessionSvc := services.NewSessionService(authSvc, hostRepo, knownRepo, vaultSvc, sshManager, bridge)
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, localFS, bridge)
+	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshManager, bridge)
 
-	authHandler := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc)
+	authHandler := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc)
 	keyHandler := app.NewKeyHandler(bridge, vaultSvc)
 	hostHandler := app.NewHostHandler(bridge, hostSvc)
 	termHandler := app.NewTerminalHandler(bridge, sessionSvc)
 	sftpHandler := app.NewSFTPHandler(bridge, transferSvc)
+	tunnelHandler := app.NewTunnelHandler(bridge, tunnelSvc)
 
 	runErr := wails.Run(&options.App{
 		Title:     "EC2 Shell Desk",
@@ -91,6 +94,7 @@ func Run(assets fs.FS) error {
 		},
 		OnShutdown: func(_ context.Context) {
 			transferSvc.CloseAll()
+			tunnelSvc.CloseAll()
 			sessionSvc.CloseAll()
 			authSvc.Lock()
 			if closeErr := store.Close(); closeErr != nil {
@@ -104,6 +108,7 @@ func Run(assets fs.FS) error {
 			hostHandler,
 			termHandler,
 			sftpHandler,
+			tunnelHandler,
 		},
 	})
 	if runErr != nil {

@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -156,6 +157,10 @@ func (s *fullTestSSHServer) serveConn(netConn net.Conn, authorizedPub ssh.Public
 	go ssh.DiscardRequests(reqs)
 
 	for newCh := range chans {
+		if newCh.ChannelType() == "direct-tcpip" {
+			go serveDirectTCPIP(newCh)
+			continue
+		}
 		if newCh.ChannelType() != "session" {
 			_ = newCh.Reject(ssh.UnknownChannelType, "unknown")
 			continue
@@ -193,6 +198,45 @@ func (s *fullTestSSHServer) serveConn(netConn net.Conn, authorizedPub ssh.Public
 			}
 		}(ch, chReqs)
 	}
+}
+
+func serveDirectTCPIP(newCh ssh.NewChannel) {
+	var payload struct {
+		DestAddr   string
+		DestPort   uint32
+		OriginAddr string
+		OriginPort uint32
+	}
+	if err := ssh.Unmarshal(newCh.ExtraData(), &payload); err != nil {
+		_ = newCh.Reject(ssh.ConnectionFailed, "invalid direct-tcpip payload")
+		return
+	}
+	targetConn, err := net.DialTimeout("tcp", net.JoinHostPort(payload.DestAddr, strconv.Itoa(int(payload.DestPort))), 2*time.Second)
+	if err != nil {
+		_ = newCh.Reject(ssh.ConnectionFailed, err.Error())
+		return
+	}
+	ch, reqs, err := newCh.Accept()
+	if err != nil {
+		_ = targetConn.Close()
+		return
+	}
+	go ssh.DiscardRequests(reqs)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(targetConn, ch)
+		_ = targetConn.Close()
+	}()
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(ch, targetConn)
+		_ = ch.CloseWrite()
+	}()
+	wg.Wait()
+	_ = ch.Close()
 }
 
 func generateSigner(t *testing.T) ssh.Signer {
@@ -239,10 +283,11 @@ func TestSessionTOFUSSHAndSFTPEndToEnd(t *testing.T) {
 	keyRepo := sqlite.NewKeyRepository(store)
 	hostRepo := sqlite.NewHostRepository(store)
 	knownRepo := sqlite.NewKnownHostRepository(store)
+	tunnelRepo := sqlite.NewTunnelRepository(store)
 
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, tunnelRepo)
 
 	termSink := newSpyTerminalSink()
 	transferSink := newSpyTransferSink()

@@ -58,18 +58,22 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	keyRepo := sqlite.NewKeyRepository(store)
 	hostRepo := sqlite.NewHostRepository(store)
 	knownRepo := sqlite.NewKnownHostRepository(store)
+	tunnelRepo := sqlite.NewTunnelRepository(store)
 
 	bridge := app.NewEventBridge()
+	sshMgr := sshclient.NewManager(sftpclient.NewFromSSHClient)
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo)
-	sessionSvc := services.NewSessionService(authSvc, hostRepo, knownRepo, vaultSvc, sshclient.NewManager(sftpclient.NewFromSSHClient), bridge)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, tunnelRepo)
+	sessionSvc := services.NewSessionService(authSvc, hostRepo, knownRepo, vaultSvc, sshMgr, bridge)
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, winfs.NewWinFS(), bridge)
+	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshMgr, bridge)
 
-	authH := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc)
+	authH := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc)
 	keyH := app.NewKeyHandler(bridge, vaultSvc)
 	hostH := app.NewHostHandler(bridge, hostSvc)
 	sftpH := app.NewSFTPHandler(bridge, transferSvc)
+	tunnelH := app.NewTunnelHandler(bridge, tunnelSvc)
 
 	status, err := authH.Status()
 	if err != nil || status.HasUsers || status.Unlocked {
@@ -110,6 +114,23 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	hosts, err := hostH.ListHosts()
 	if err != nil || len(hosts) != 1 || hosts[0].ID != host.ID {
 		t.Fatalf("ListHosts() = (%+v, %v)", hosts, err)
+	}
+
+	tun, err := tunnelH.CreateTunnel(services.SaveTunnelInput{
+		HostID:     host.ID,
+		Name:       "RDS Postgres",
+		Preset:     domain.TunnelPresetPostgreSQL,
+		LocalHost:  domain.DefaultTunnelLocalHost,
+		LocalPort:  15432,
+		RemoteHost: "rds.internal",
+		RemotePort: 5432,
+	})
+	if err != nil || tun.LocalPort != 15432 {
+		t.Fatalf("CreateTunnel() = (%+v, %v)", tun, err)
+	}
+	tunnels, err := tunnelH.ListTunnels()
+	if err != nil || len(tunnels) != 1 {
+		t.Fatalf("ListTunnels() = (%+v, %v)", tunnels, err)
 	}
 
 	roots, err := sftpH.ListLocalRoots()

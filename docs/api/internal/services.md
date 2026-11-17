@@ -21,13 +21,14 @@ Package services implements application use cases orchestrating authentication, 
   - [func \(s \*AuthService\) Lock\(\)](<#AuthService.Lock>)
   - [func \(s \*AuthService\) Login\(ctx context.Context, username, password string\) \(domain.UserProfile, error\)](<#AuthService.Login>)
 - [type HostService](<#HostService>)
-  - [func NewHostService\(auth \*AuthService, hosts ports.HostRepository, keys ports.KeyRepository\) \*HostService](<#NewHostService>)
+  - [func NewHostService\(auth \*AuthService, hosts ports.HostRepository, keys ports.KeyRepository, tunnels ports.TunnelRepository\) \*HostService](<#NewHostService>)
   - [func \(s \*HostService\) CreateHost\(ctx context.Context, input SaveHostInput\) \(domain.HostInstance, error\)](<#HostService.CreateHost>)
   - [func \(s \*HostService\) DeleteHost\(ctx context.Context, hostID string\) error](<#HostService.DeleteHost>)
   - [func \(s \*HostService\) GetHost\(ctx context.Context, hostID string\) \(domain.HostInstance, error\)](<#HostService.GetHost>)
   - [func \(s \*HostService\) ListHosts\(ctx context.Context\) \(\[\]domain.HostInstance, error\)](<#HostService.ListHosts>)
   - [func \(s \*HostService\) UpdateHost\(ctx context.Context, input SaveHostInput\) \(domain.HostInstance, error\)](<#HostService.UpdateHost>)
 - [type SaveHostInput](<#SaveHostInput>)
+- [type SaveTunnelInput](<#SaveTunnelInput>)
 - [type SessionService](<#SessionService>)
   - [func NewSessionService\(auth \*AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, vault \*VaultService, sshManager ports.SSHSessionManager, sink TerminalEventSink\) \*SessionService](<#NewSessionService>)
   - [func \(s \*SessionService\) CloseAll\(\)](<#SessionService.CloseAll>)
@@ -60,6 +61,17 @@ Package services implements application use cases orchestrating authentication, 
   - [func \(s \*TransferService\) RenameRemote\(ctx context.Context, sessionID, oldPath, newPath string\) error](<#TransferService.RenameRemote>)
   - [func \(s \*TransferService\) StartDownload\(sessionID, remotePath, localPath string\) \(domain.TransferTask, error\)](<#TransferService.StartDownload>)
   - [func \(s \*TransferService\) StartUpload\(sessionID, localPath, remotePath string\) \(domain.TransferTask, error\)](<#TransferService.StartUpload>)
+- [type TunnelEventSink](<#TunnelEventSink>)
+- [type TunnelService](<#TunnelService>)
+  - [func NewTunnelService\(auth \*AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, tunnels ports.TunnelRepository, vault \*VaultService, sshManager ports.SSHSessionManager, sink TunnelEventSink\) \*TunnelService](<#NewTunnelService>)
+  - [func \(s \*TunnelService\) CloseAll\(\)](<#TunnelService.CloseAll>)
+  - [func \(s \*TunnelService\) CreateTunnel\(ctx context.Context, input SaveTunnelInput\) \(domain.SSHTunnel, error\)](<#TunnelService.CreateTunnel>)
+  - [func \(s \*TunnelService\) DeleteTunnel\(ctx context.Context, tunnelID string\) error](<#TunnelService.DeleteTunnel>)
+  - [func \(s \*TunnelService\) ListStatuses\(\) \(\[\]domain.TunnelRuntimeStatus, error\)](<#TunnelService.ListStatuses>)
+  - [func \(s \*TunnelService\) ListTunnels\(ctx context.Context\) \(\[\]domain.SSHTunnel, error\)](<#TunnelService.ListTunnels>)
+  - [func \(s \*TunnelService\) StartTunnel\(ctx context.Context, tunnelID string, passwordFallback string, onTrust TOFUTrustPromptFunc\) \(domain.TunnelRuntimeStatus, error\)](<#TunnelService.StartTunnel>)
+  - [func \(s \*TunnelService\) StopTunnel\(tunnelID string\) error](<#TunnelService.StopTunnel>)
+  - [func \(s \*TunnelService\) UpdateTunnel\(ctx context.Context, input SaveTunnelInput\) \(domain.SSHTunnel, error\)](<#TunnelService.UpdateTunnel>)
 - [type VaultService](<#VaultService>)
   - [func NewVaultService\(auth \*AuthService, keys ports.KeyRepository, encryptor ports.KeyEncryptor, inspector ports.KeyInspector\) \*VaultService](<#NewVaultService>)
   - [func \(s \*VaultService\) DecryptKeyForSession\(ctx context.Context, keyID string\) \(\[\]byte, \[\]byte, error\)](<#VaultService.DecryptKeyForSession>)
@@ -161,7 +173,7 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (dom
 Login authenticates a local user, derives their vault master key, and sets the active session.
 
 <a name="HostService"></a>
-## type [HostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L28-L32>)
+## type [HostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L28-L33>)
 
 HostService manages EC2 and Linux host instances isolated strictly per authenticated user.
 
@@ -172,16 +184,16 @@ type HostService struct {
 ```
 
 <a name="NewHostService"></a>
-### func [NewHostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L35>)
+### func [NewHostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L36-L41>)
 
 ```go
-func NewHostService(auth *AuthService, hosts ports.HostRepository, keys ports.KeyRepository) *HostService
+func NewHostService(auth *AuthService, hosts ports.HostRepository, keys ports.KeyRepository, tunnels ports.TunnelRepository) *HostService
 ```
 
-NewHostService constructs a HostService with active session, host, and key repositories.
+NewHostService constructs a HostService with active session, host, key, and optional tunnel repositories.
 
 <a name="HostService.CreateHost"></a>
-### func \(\*HostService\) [CreateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L44>)
+### func \(\*HostService\) [CreateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L51>)
 
 ```go
 func (s *HostService) CreateHost(ctx context.Context, input SaveHostInput) (domain.HostInstance, error)
@@ -190,16 +202,16 @@ func (s *HostService) CreateHost(ctx context.Context, input SaveHostInput) (doma
 CreateHost validates and persists a new HostInstance owned by the currently authenticated user.
 
 <a name="HostService.DeleteHost"></a>
-### func \(\*HostService\) [DeleteHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L139>)
+### func \(\*HostService\) [DeleteHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L146>)
 
 ```go
 func (s *HostService) DeleteHost(ctx context.Context, hostID string) error
 ```
 
-DeleteHost deletes a HostInstance owned by the currently authenticated user.
+DeleteHost deletes a HostInstance owned by the currently authenticated user unless tunnels reference it.
 
 <a name="HostService.GetHost"></a>
-### func \(\*HostService\) [GetHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L85>)
+### func \(\*HostService\) [GetHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L92>)
 
 ```go
 func (s *HostService) GetHost(ctx context.Context, hostID string) (domain.HostInstance, error)
@@ -208,7 +220,7 @@ func (s *HostService) GetHost(ctx context.Context, hostID string) (domain.HostIn
 GetHost retrieves a single HostInstance belonging to the currently authenticated user.
 
 <a name="HostService.ListHosts"></a>
-### func \(\*HostService\) [ListHosts](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L71>)
+### func \(\*HostService\) [ListHosts](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L78>)
 
 ```go
 func (s *HostService) ListHosts(ctx context.Context) ([]domain.HostInstance, error)
@@ -217,7 +229,7 @@ func (s *HostService) ListHosts(ctx context.Context) ([]domain.HostInstance, err
 ListHosts returns all HostInstance records belonging to the currently authenticated user.
 
 <a name="HostService.UpdateHost"></a>
-### func \(\*HostService\) [UpdateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L103>)
+### func \(\*HostService\) [UpdateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L110>)
 
 ```go
 func (s *HostService) UpdateHost(ctx context.Context, input SaveHostInput) (domain.HostInstance, error)
@@ -240,6 +252,25 @@ type SaveHostInput struct {
     SSHKeyID    string             `json:"sshKeyId"`
     Environment domain.Environment `json:"environment"`
     Notes       string             `json:"notes"`
+}
+```
+
+<a name="SaveTunnelInput"></a>
+## type [SaveTunnelInput](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L21-L31>)
+
+SaveTunnelInput captures fields required to create or update an SSH port\-forwarding tunnel.
+
+```go
+type SaveTunnelInput struct {
+    ID         string              `json:"id,omitempty"`
+    HostID     string              `json:"hostId"`
+    Name       string              `json:"name"`
+    Preset     domain.TunnelPreset `json:"preset"`
+    LocalHost  string              `json:"localHost"`
+    LocalPort  int                 `json:"localPort"`
+    RemoteHost string              `json:"remoteHost"`
+    RemotePort int                 `json:"remotePort"`
+    Notes      string              `json:"notes"`
 }
 ```
 
@@ -539,6 +570,109 @@ func (s *TransferService) StartUpload(sessionID, localPath, remotePath string) (
 ```
 
 StartUpload queues and executes an asynchronous cancelable file upload from localPath to remotePath.
+
+<a name="TunnelEventSink"></a>
+## type [TunnelEventSink](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L34-L36>)
+
+TunnelEventSink receives live tunnel status and traffic updates for the desktop UI.
+
+```go
+type TunnelEventSink interface {
+    OnTunnelStatusChanged(status domain.TunnelRuntimeStatus)
+}
+```
+
+<a name="TunnelService"></a>
+## type [TunnelService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L45-L56>)
+
+TunnelService manages user\-isolated SSH local port\-forwarding tunnels for databases and internal endpoints.
+
+```go
+type TunnelService struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewTunnelService"></a>
+### func [NewTunnelService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L59-L67>)
+
+```go
+func NewTunnelService(auth *AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, tunnels ports.TunnelRepository, vault *VaultService, sshManager ports.SSHSessionManager, sink TunnelEventSink) *TunnelService
+```
+
+NewTunnelService constructs a TunnelService orchestrating saved SSH port forwards for the active user.
+
+<a name="TunnelService.CloseAll"></a>
+### func \(\*TunnelService\) [CloseAll](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L332>)
+
+```go
+func (s *TunnelService) CloseAll()
+```
+
+CloseAll stops all active SSH tunnels across the service \(typically on lock or shutdown\).
+
+<a name="TunnelService.CreateTunnel"></a>
+### func \(\*TunnelService\) [CreateTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L81>)
+
+```go
+func (s *TunnelService) CreateTunnel(ctx context.Context, input SaveTunnelInput) (domain.SSHTunnel, error)
+```
+
+CreateTunnel validates and persists a new SSHTunnel linked to a user\-owned HostInstance bastion.
+
+<a name="TunnelService.DeleteTunnel"></a>
+### func \(\*TunnelService\) [DeleteTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L160>)
+
+```go
+func (s *TunnelService) DeleteTunnel(ctx context.Context, tunnelID string) error
+```
+
+DeleteTunnel deletes a stopped SSHTunnel owned by the authenticated user.
+
+<a name="TunnelService.ListStatuses"></a>
+### func \(\*TunnelService\) [ListStatuses](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L353>)
+
+```go
+func (s *TunnelService) ListStatuses() ([]domain.TunnelRuntimeStatus, error)
+```
+
+ListStatuses returns live runtime statuses for active tunnels owned by the authenticated user.
+
+<a name="TunnelService.ListTunnels"></a>
+### func \(\*TunnelService\) [ListTunnels](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L108>)
+
+```go
+func (s *TunnelService) ListTunnels(ctx context.Context) ([]domain.SSHTunnel, error)
+```
+
+ListTunnels returns all saved SSHTunnel definitions owned exclusively by the authenticated user.
+
+<a name="TunnelService.StartTunnel"></a>
+### func \(\*TunnelService\) [StartTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L181-L186>)
+
+```go
+func (s *TunnelService) StartTunnel(ctx context.Context, tunnelID string, passwordFallback string, onTrust TOFUTrustPromptFunc) (domain.TunnelRuntimeStatus, error)
+```
+
+StartTunnel establishes the SSH bastion connection with TOFU verification and opens the local port forwarder.
+
+<a name="TunnelService.StopTunnel"></a>
+### func \(\*TunnelService\) [StopTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L302>)
+
+```go
+func (s *TunnelService) StopTunnel(tunnelID string) error
+```
+
+StopTunnel stops an active SSH tunnel owned by the authenticated user.
+
+<a name="TunnelService.UpdateTunnel"></a>
+### func \(\*TunnelService\) [UpdateTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L121>)
+
+```go
+func (s *TunnelService) UpdateTunnel(ctx context.Context, input SaveTunnelInput) (domain.SSHTunnel, error)
+```
+
+UpdateTunnel updates a stopped SSHTunnel definition owned by the authenticated user.
 
 <a name="VaultService"></a>
 ## type [VaultService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/vault_service.go#L16-L21>)

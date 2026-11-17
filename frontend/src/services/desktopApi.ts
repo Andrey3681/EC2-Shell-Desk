@@ -3,6 +3,7 @@ import * as HostHandler from "../../wailsjs/go/app/HostHandler";
 import * as KeyHandler from "../../wailsjs/go/app/KeyHandler";
 import * as SFTPHandler from "../../wailsjs/go/app/SFTPHandler";
 import * as TerminalHandler from "../../wailsjs/go/app/TerminalHandler";
+import * as TunnelHandler from "../../wailsjs/go/app/TunnelHandler";
 import { app, domain, services } from "../../wailsjs/go/models";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 
@@ -14,7 +15,10 @@ export type KnownHost = domain.KnownHost;
 export type SessionInfo = domain.SessionInfo;
 export type FileEntry = domain.FileEntry;
 export type TransferTask = domain.TransferTask;
+export type SSHTunnel = domain.SSHTunnel;
+export type TunnelRuntimeStatus = domain.TunnelRuntimeStatus;
 export type SaveHostInput = services.SaveHostInput;
+export type SaveTunnelInput = services.SaveTunnelInput;
 
 export interface TOFUChallengeEvent {
   requestId: string;
@@ -111,5 +115,16 @@ export const desktopApi = {
     cancelTransfer: (transferId: string) => SFTPHandler.CancelTransfer(transferId),
     listTransfers: async () => (await SFTPHandler.ListTransfers()) ?? [],
     onProgress: (cb: (task: TransferTask) => void) => EventsOn("sftp:progress", cb),
+  },
+  tunnels: {
+    list: async () => (await TunnelHandler.ListTunnels()) ?? [],
+    create: (input: SaveTunnelInput) => TunnelHandler.CreateTunnel(input),
+    update: (input: SaveTunnelInput) => TunnelHandler.UpdateTunnel(input),
+    delete: (tunnelId: string) => TunnelHandler.DeleteTunnel(tunnelId),
+    start: (tunnelId: string, passwordFallback: string) =>
+      TunnelHandler.StartTunnel(tunnelId, passwordFallback),
+    stop: (tunnelId: string) => TunnelHandler.StopTunnel(tunnelId),
+    listStatuses: async () => (await TunnelHandler.ListStatuses()) ?? [],
+    onStatus: (cb: (status: TunnelRuntimeStatus) => void) => EventsOn("tunnel:status", cb),
   },
 };

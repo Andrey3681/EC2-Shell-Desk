@@ -50,4 +50,13 @@ var (
 
 	// ErrPathTraversal indicates an unsafe path attempting to escape allowed directory boundaries.
 	ErrPathTraversal = errors.New("unsafe path traversal detected")
+
+	// ErrHostInUse indicates that a host instance cannot be deleted while referenced by saved SSH tunnels.
+	ErrHostInUse = errors.New("host instance is referenced by ssh tunnels")
+
+	// ErrTunnelAlreadyActive indicates that the requested SSH tunnel is already running.
+	ErrTunnelAlreadyActive = errors.New("ssh tunnel is already active")
+
+	// ErrLocalPortInUse indicates that the requested local TCP port is already bound by another process or tunnel.
+	ErrLocalPortInUse = errors.New("local port is already in use")
 )

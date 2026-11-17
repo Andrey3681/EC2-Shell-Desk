@@ -94,16 +94,58 @@ func (s *testSSHServer) handleConn(netConn net.Conn, cfg *ssh.ServerConfig) {
 	go ssh.DiscardRequests(reqs)
 
 	for newCh := range chans {
-		if newCh.ChannelType() != "session" {
+		switch newCh.ChannelType() {
+		case "session":
+			ch, requests, acceptErr := newCh.Accept()
+			if acceptErr != nil {
+				continue
+			}
+			go s.handleSession(ch, requests)
+		case "direct-tcpip":
+			go s.handleDirectTCPIP(newCh)
+		default:
 			_ = newCh.Reject(ssh.UnknownChannelType, "unknown channel type")
-			continue
 		}
-		ch, requests, acceptErr := newCh.Accept()
-		if acceptErr != nil {
-			continue
-		}
-		go s.handleSession(ch, requests)
 	}
+}
+
+func (s *testSSHServer) handleDirectTCPIP(newCh ssh.NewChannel) {
+	var payload struct {
+		DestAddr   string
+		DestPort   uint32
+		OriginAddr string
+		OriginPort uint32
+	}
+	if err := ssh.Unmarshal(newCh.ExtraData(), &payload); err != nil {
+		_ = newCh.Reject(ssh.ConnectionFailed, "invalid payload")
+		return
+	}
+	targetConn, err := net.DialTimeout("tcp", net.JoinHostPort(payload.DestAddr, strconv.Itoa(int(payload.DestPort))), 2*time.Second)
+	if err != nil {
+		_ = newCh.Reject(ssh.ConnectionFailed, err.Error())
+		return
+	}
+	ch, reqs, err := newCh.Accept()
+	if err != nil {
+		_ = targetConn.Close()
+		return
+	}
+	go ssh.DiscardRequests(reqs)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(targetConn, ch)
+		_ = targetConn.Close()
+	}()
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(ch, targetConn)
+		_ = ch.CloseWrite()
+	}()
+	wg.Wait()
+	_ = ch.Close()
 }
 
 func (s *testSSHServer) handleSession(ch ssh.Channel, reqs <-chan *ssh.Request) {
@@ -289,4 +331,101 @@ func TestConnectPTYRejectsPPKAndMissingPassphrase(t *testing.T) {
 		})
 	}
 	_ = strconv.Itoa(0)
+}
+
+func TestStartLocalForwardEndToEndAndBusyPort(t *testing.T) {
+	// Spin up a mock private DB TCP server that echoes requests back.
+	dbLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen mock db: %v", err)
+	}
+	t.Cleanup(func() { _ = dbLn.Close() })
+	go func() {
+		for {
+			c, aErr := dbLn.Accept()
+			if aErr != nil {
+				return
+			}
+			go func(conn net.Conn) {
+				defer func() { _ = conn.Close() }()
+				_, _ = io.Copy(conn, conn)
+			}(c)
+		}
+	}()
+	dbAddr := dbLn.Addr().(*net.TCPAddr)
+
+	rawKey, sshPub := generateClientKey(t, nil)
+	srv := startEmbeddedSSHServer(t, sshPub)
+	mgr := sshclient.NewManager(nil, sshclient.WithDialTimeout(5*time.Second))
+
+	bastion := domain.HostInstance{
+		ID:          "h-bastion",
+		OwnerUserID: "u1",
+		Alias:       "Bastion",
+		HostAddress: srv.host,
+		Port:        srv.port,
+		SSHUsername: "ec2-user",
+	}
+
+	handle, err := mgr.StartLocalForward(context.Background(), ports.TunnelForwardRequest{
+		Host:          bastion,
+		PrivateKeyPEM: rawKey,
+		LocalHost:     "127.0.0.1",
+		LocalPort:     0,
+		RemoteHost:    dbAddr.IP.String(),
+		RemotePort:    dbAddr.Port,
+		VerifyHostKey: func(_ context.Context, _ ports.HostKeyChallenge) error { return nil },
+	})
+	if err != nil {
+		t.Fatalf("StartLocalForward() error = %v", err)
+	}
+	defer func() { _ = handle.Close() }()
+
+	// Connect as a local DB client (like pgAdmin / Compass) to the forwarded port.
+	clientConn, err := net.DialTimeout("tcp", handle.LocalAddr(), 2*time.Second)
+	if err != nil {
+		t.Fatalf("dial local tunnel addr %s: %v", handle.LocalAddr(), err)
+	}
+	msg := []byte("SELECT 1;")
+	if _, err := clientConn.Write(msg); err != nil {
+		t.Fatalf("write through tunnel: %v", err)
+	}
+	resp := make([]byte, len(msg))
+	if _, err := io.ReadFull(clientConn, resp); err != nil {
+		t.Fatalf("read from tunnel: %v", err)
+	}
+	if !bytes.Equal(resp, msg) {
+		t.Fatalf("tunnel response = %q, want %q", resp, msg)
+	}
+	_ = clientConn.Close()
+
+	inBytes, outBytes := handle.BytesTransferred()
+	if inBytes < int64(len(msg)) || outBytes < int64(len(msg)) {
+		t.Fatalf("expected >=%d bytes transferred, got in=%d out=%d", len(msg), inBytes, outBytes)
+	}
+
+	// Attempt to bind the same busy local port must return ErrLocalPortInUse.
+	_, busyPortStr, _ := net.SplitHostPort(handle.LocalAddr())
+	busyPort, _ := strconv.Atoi(busyPortStr)
+	_, err = mgr.StartLocalForward(context.Background(), ports.TunnelForwardRequest{
+		Host:          bastion,
+		PrivateKeyPEM: rawKey,
+		LocalHost:     "127.0.0.1",
+		LocalPort:     busyPort,
+		RemoteHost:    dbAddr.IP.String(),
+		RemotePort:    dbAddr.Port,
+		VerifyHostKey: func(_ context.Context, _ ports.HostKeyChallenge) error { return nil },
+	})
+	if !errors.Is(err, domain.ErrLocalPortInUse) {
+		t.Fatalf("busy port error = %v, want ErrLocalPortInUse", err)
+	}
+
+	if err := handle.Close(); err != nil {
+		t.Fatalf("handle.Close() error = %v", err)
+	}
+	select {
+	case <-handle.Done():
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for tunnel Done channel")
+	}
 }

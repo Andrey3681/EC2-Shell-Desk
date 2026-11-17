@@ -24,10 +24,15 @@ Package domain defines pure business entities, invariants, and sentinel errors f
 - [type SSHKey](<#SSHKey>)
   - [func \(k SSHKey\) Summary\(\) SSHKeySummary](<#SSHKey.Summary>)
 - [type SSHKeySummary](<#SSHKeySummary>)
+- [type SSHTunnel](<#SSHTunnel>)
+  - [func \(t SSHTunnel\) Validate\(\) error](<#SSHTunnel.Validate>)
 - [type SessionInfo](<#SessionInfo>)
 - [type TransferDirection](<#TransferDirection>)
 - [type TransferState](<#TransferState>)
 - [type TransferTask](<#TransferTask>)
+- [type TunnelPreset](<#TunnelPreset>)
+- [type TunnelRuntimeStatus](<#TunnelRuntimeStatus>)
+- [type TunnelState](<#TunnelState>)
 - [type User](<#User>)
   - [func \(u User\) Profile\(\) UserProfile](<#User.Profile>)
 - [type UserProfile](<#UserProfile>)
@@ -52,6 +57,12 @@ const (
 
 ```go
 const DefaultSSHPort = 22
+```
+
+<a name="DefaultTunnelLocalHost"></a>DefaultTunnelLocalHost restricts local tunnel listeners to the loopback interface by default.
+
+```go
+const DefaultTunnelLocalHost = "127.0.0.1"
 ```
 
 ## Variables
@@ -107,6 +118,15 @@ var (
 
     // ErrPathTraversal indicates an unsafe path attempting to escape allowed directory boundaries.
     ErrPathTraversal = errors.New("unsafe path traversal detected")
+
+    // ErrHostInUse indicates that a host instance cannot be deleted while referenced by saved SSH tunnels.
+    ErrHostInUse = errors.New("host instance is referenced by ssh tunnels")
+
+    // ErrTunnelAlreadyActive indicates that the requested SSH tunnel is already running.
+    ErrTunnelAlreadyActive = errors.New("ssh tunnel is already active")
+
+    // ErrLocalPortInUse indicates that the requested local TCP port is already bound by another process or tunnel.
+    ErrLocalPortInUse = errors.New("local port is already in use")
 )
 ```
 
@@ -291,6 +311,37 @@ type SSHKeySummary struct {
 }
 ```
 
+<a name="SSHTunnel"></a>
+## type [SSHTunnel](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/ssh_tunnel.go#L45-L58>)
+
+SSHTunnel defines a saved local port\-forwarding tunnel routed through a user\-owned HostInstance bastion.
+
+```go
+type SSHTunnel struct {
+    ID          string       `json:"id"`
+    OwnerUserID string       `json:"ownerUserId"`
+    HostID      string       `json:"hostId"`
+    Name        string       `json:"name"`
+    Preset      TunnelPreset `json:"preset"`
+    LocalHost   string       `json:"localHost"`
+    LocalPort   int          `json:"localPort"`
+    RemoteHost  string       `json:"remoteHost"`
+    RemotePort  int          `json:"remotePort"`
+    Notes       string       `json:"notes"`
+    CreatedAt   time.Time    `json:"createdAt"`
+    UpdatedAt   time.Time    `json:"updatedAt"`
+}
+```
+
+<a name="SSHTunnel.Validate"></a>
+### func \(SSHTunnel\) [Validate](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/ssh_tunnel.go#L61>)
+
+```go
+func (t SSHTunnel) Validate() error
+```
+
+Validate checks that required SSHTunnel fields, ports, and endpoints are valid.
+
 <a name="SessionInfo"></a>
 ## type [SessionInfo](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/session.go#L6-L15>)
 
@@ -375,6 +426,77 @@ type TransferTask struct {
     StartedAt        time.Time         `json:"startedAt"`
     CompletedAt      *time.Time        `json:"completedAt,omitempty"`
 }
+```
+
+<a name="TunnelPreset"></a>
+## type [TunnelPreset](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/ssh_tunnel.go#L10>)
+
+TunnelPreset identifies a database or service template used to configure an SSH tunnel.
+
+```go
+type TunnelPreset string
+```
+
+<a name="TunnelPresetPostgreSQL"></a>
+
+```go
+const (
+    // TunnelPresetPostgreSQL identifies a PostgreSQL / AWS RDS Postgres tunnel (default remote port 5432).
+    TunnelPresetPostgreSQL TunnelPreset = "postgresql"
+    // TunnelPresetMySQL identifies a MySQL / MariaDB / Aurora tunnel (default remote port 3306).
+    TunnelPresetMySQL TunnelPreset = "mysql"
+    // TunnelPresetMongoDB identifies a MongoDB / AWS DocumentDB tunnel (default remote port 27017).
+    TunnelPresetMongoDB TunnelPreset = "mongodb"
+    // TunnelPresetRedis identifies a Redis / AWS ElastiCache tunnel (default remote port 6379).
+    TunnelPresetRedis TunnelPreset = "redis"
+    // TunnelPresetSQLServer identifies a Microsoft SQL Server / RDS SQL Server tunnel (default remote port 1433).
+    TunnelPresetSQLServer TunnelPreset = "sqlserver"
+    // TunnelPresetCustom identifies a user-defined TCP port-forwarding tunnel.
+    TunnelPresetCustom TunnelPreset = "custom"
+)
+```
+
+<a name="TunnelRuntimeStatus"></a>
+## type [TunnelRuntimeStatus](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/ssh_tunnel.go#L95-L105>)
+
+TunnelRuntimeStatus reports real\-time state and traffic counters for an SSHTunnel.
+
+```go
+type TunnelRuntimeStatus struct {
+    TunnelID          string      `json:"tunnelId"`
+    OwnerUserID       string      `json:"ownerUserId"`
+    State             TunnelState `json:"state"`
+    LocalEndpoint     string      `json:"localEndpoint"`
+    ActiveConnections int         `json:"activeConnections"`
+    BytesIn           int64       `json:"bytesIn"`
+    BytesOut          int64       `json:"bytesOut"`
+    ErrorMessage      string      `json:"errorMessage,omitempty"`
+    StartedAt         *time.Time  `json:"startedAt,omitempty"`
+}
+```
+
+<a name="TunnelState"></a>
+## type [TunnelState](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/ssh_tunnel.go#L28>)
+
+TunnelState describes the live runtime status of a local SSH port\-forwarding tunnel.
+
+```go
+type TunnelState string
+```
+
+<a name="TunnelStateStopped"></a>
+
+```go
+const (
+    // TunnelStateStopped indicates the tunnel listener is inactive.
+    TunnelStateStopped TunnelState = "stopped"
+    // TunnelStateConnecting indicates the SSH bastion handshake is in progress.
+    TunnelStateConnecting TunnelState = "connecting"
+    // TunnelStateActive indicates the local TCP port is listening and forwarding over SSH.
+    TunnelStateActive TunnelState = "active"
+    // TunnelStateError indicates the tunnel stopped due to a connection or bind failure.
+    TunnelStateError TunnelState = "error"
+)
 ```
 
 <a name="User"></a>

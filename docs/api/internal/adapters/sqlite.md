@@ -34,6 +34,14 @@ Package sqlite implements repository ports using pure\-Go SQLite persistence wit
 - [type Store](<#Store>)
   - [func Open\(ctx context.Context, dbPath string\) \(\*Store, error\)](<#Open>)
   - [func \(s \*Store\) Close\(\) error](<#Store.Close>)
+- [type TunnelRepository](<#TunnelRepository>)
+  - [func NewTunnelRepository\(store \*Store\) \*TunnelRepository](<#NewTunnelRepository>)
+  - [func \(r \*TunnelRepository\) CountByHost\(ctx context.Context, ownerUserID, hostID string\) \(int, error\)](<#TunnelRepository.CountByHost>)
+  - [func \(r \*TunnelRepository\) Create\(ctx context.Context, tunnel domain.SSHTunnel\) error](<#TunnelRepository.Create>)
+  - [func \(r \*TunnelRepository\) Delete\(ctx context.Context, ownerUserID, tunnelID string\) error](<#TunnelRepository.Delete>)
+  - [func \(r \*TunnelRepository\) GetByID\(ctx context.Context, ownerUserID, tunnelID string\) \(domain.SSHTunnel, error\)](<#TunnelRepository.GetByID>)
+  - [func \(r \*TunnelRepository\) ListByUser\(ctx context.Context, ownerUserID string\) \(\[\]domain.SSHTunnel, error\)](<#TunnelRepository.ListByUser>)
+  - [func \(r \*TunnelRepository\) Update\(ctx context.Context, tunnel domain.SSHTunnel\) error](<#TunnelRepository.Update>)
 - [type UserRepository](<#UserRepository>)
   - [func NewUserRepository\(store \*Store\) \*UserRepository](<#NewUserRepository>)
   - [func \(r \*UserRepository\) Count\(ctx context.Context\) \(int, error\)](<#UserRepository.Count>)
@@ -266,6 +274,80 @@ func (s *Store) Close() error
 ```
 
 Close closes the underlying SQLite database connection.
+
+<a name="TunnelRepository"></a>
+## type [TunnelRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/tunnel_repo.go#L13-L15>)
+
+TunnelRepository implements ports.TunnelRepository backed by SQLite with strict owner\_user\_id isolation.
+
+```go
+type TunnelRepository struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewTunnelRepository"></a>
+### func [NewTunnelRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/tunnel_repo.go#L18>)
+
+```go
+func NewTunnelRepository(store *Store) *TunnelRepository
+```
+
+NewTunnelRepository creates a TunnelRepository using the provided SQLite Store.
+
+<a name="TunnelRepository.CountByHost"></a>
+### func \(\*TunnelRepository\) [CountByHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/tunnel_repo.go#L161>)
+
+```go
+func (r *TunnelRepository) CountByHost(ctx context.Context, ownerUserID, hostID string) (int, error)
+```
+
+CountByHost returns how many saved tunnels owned by ownerUserID reference hostID.
+
+<a name="TunnelRepository.Create"></a>
+### func \(\*TunnelRepository\) [Create](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/tunnel_repo.go#L23>)
+
+```go
+func (r *TunnelRepository) Create(ctx context.Context, tunnel domain.SSHTunnel) error
+```
+
+Create inserts a new SSHTunnel owned by tunnel.OwnerUserID.
+
+<a name="TunnelRepository.Delete"></a>
+### func \(\*TunnelRepository\) [Delete](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/tunnel_repo.go#L144>)
+
+```go
+func (r *TunnelRepository) Delete(ctx context.Context, ownerUserID, tunnelID string) error
+```
+
+Delete removes an SSHTunnel only if owned by ownerUserID.
+
+<a name="TunnelRepository.GetByID"></a>
+### func \(\*TunnelRepository\) [GetByID](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/tunnel_repo.go#L56>)
+
+```go
+func (r *TunnelRepository) GetByID(ctx context.Context, ownerUserID, tunnelID string) (domain.SSHTunnel, error)
+```
+
+GetByID retrieves an SSHTunnel only if it belongs to ownerUserID.
+
+<a name="TunnelRepository.ListByUser"></a>
+### func \(\*TunnelRepository\) [ListByUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/tunnel_repo.go#L74>)
+
+```go
+func (r *TunnelRepository) ListByUser(ctx context.Context, ownerUserID string) ([]domain.SSHTunnel, error)
+```
+
+ListByUser returns all SSHTunnel records belonging strictly to ownerUserID.
+
+<a name="TunnelRepository.Update"></a>
+### func \(\*TunnelRepository\) [Update](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/tunnel_repo.go#L105>)
+
+```go
+func (r *TunnelRepository) Update(ctx context.Context, tunnel domain.SSHTunnel) error
+```
+
+Update modifies an existing SSHTunnel only if owned by tunnel.OwnerUserID.
 
 <a name="UserRepository"></a>
 ## type [UserRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/user_repo.go#L13-L15>)

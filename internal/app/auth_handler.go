@@ -21,6 +21,7 @@ type AuthHandler struct {
 	auth      *services.AuthService
 	sessions  *services.SessionService
 	transfers *services.TransferService
+	tunnels   *services.TunnelService
 }
 
 // NewAuthHandler constructs an AuthHandler wired to authentication and active session lifecycles.
@@ -29,12 +30,14 @@ func NewAuthHandler(
 	auth *services.AuthService,
 	sessions *services.SessionService,
 	transfers *services.TransferService,
+	tunnels *services.TunnelService,
 ) *AuthHandler {
 	return &AuthHandler{
 		bridge:    bridge,
 		auth:      auth,
 		sessions:  sessions,
 		transfers: transfers,
+		tunnels:   tunnels,
 	}
 }
 
@@ -79,16 +82,22 @@ func (h *AuthHandler) Login(username, password string) (domain.UserProfile, erro
 	if h.transfers != nil {
 		h.transfers.CloseAll()
 	}
+	if h.tunnels != nil {
+		h.tunnels.CloseAll()
+	}
 	if h.sessions != nil {
 		h.sessions.CloseAll()
 	}
 	return h.auth.Login(h.bridge.Context(), username, password)
 }
 
-// Lock terminates active SSH/SFTP sessions and wipes the unlocked master key from memory.
+// Lock terminates active SSH/SFTP sessions and tunnels and wipes the unlocked master key from memory.
 func (h *AuthHandler) Lock() {
 	if h.transfers != nil {
 		h.transfers.CloseAll()
+	}
+	if h.tunnels != nil {
+		h.tunnels.CloseAll()
 	}
 	if h.sessions != nil {
 		h.sessions.CloseAll()

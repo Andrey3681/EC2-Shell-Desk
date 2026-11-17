@@ -26,17 +26,24 @@ type SaveHostInput struct {
 
 // HostService manages EC2 and Linux host instances isolated strictly per authenticated user.
 type HostService struct {
-	auth  *AuthService
-	hosts ports.HostRepository
-	keys  ports.KeyRepository
+	auth    *AuthService
+	hosts   ports.HostRepository
+	keys    ports.KeyRepository
+	tunnels ports.TunnelRepository
 }
 
-// NewHostService constructs a HostService with active session, host, and key repositories.
-func NewHostService(auth *AuthService, hosts ports.HostRepository, keys ports.KeyRepository) *HostService {
+// NewHostService constructs a HostService with active session, host, key, and optional tunnel repositories.
+func NewHostService(
+	auth *AuthService,
+	hosts ports.HostRepository,
+	keys ports.KeyRepository,
+	tunnels ports.TunnelRepository,
+) *HostService {
 	return &HostService{
-		auth:  auth,
-		hosts: hosts,
-		keys:  keys,
+		auth:    auth,
+		hosts:   hosts,
+		keys:    keys,
+		tunnels: tunnels,
 	}
 }
 
@@ -135,7 +142,7 @@ func (s *HostService) UpdateHost(ctx context.Context, input SaveHostInput) (doma
 	return updated, nil
 }
 
-// DeleteHost deletes a HostInstance owned by the currently authenticated user.
+// DeleteHost deletes a HostInstance owned by the currently authenticated user unless tunnels reference it.
 func (s *HostService) DeleteHost(ctx context.Context, hostID string) error {
 	if strings.TrimSpace(hostID) == "" {
 		return fmt.Errorf("%w: host id is required", domain.ErrInvalidInput)
@@ -144,6 +151,16 @@ func (s *HostService) DeleteHost(ctx context.Context, hostID string) error {
 	user, err := s.auth.CurrentUser()
 	if err != nil {
 		return err
+	}
+
+	if s.tunnels != nil {
+		refs, refErr := s.tunnels.CountByHost(ctx, user.ID, hostID)
+		if refErr != nil {
+			return fmt.Errorf("check host tunnel references: %w", refErr)
+		}
+		if refs > 0 {
+			return fmt.Errorf("%w: referenced by %d tunnel(s)", domain.ErrHostInUse, refs)
+		}
 	}
 
 	if err := s.hosts.Delete(ctx, user.ID, hostID); err != nil {

@@ -192,4 +192,48 @@ func TestMultiUserIsolationAndCRUD(t *testing.T) {
 	if gotKH, err := knownRepo.GetByHostPort(ctx, alice.ID, "54.10.20.30", 22); err != nil || gotKH.Fingerprint != kh.Fingerprint {
 		t.Fatalf("Alice GetByHostPort() = (%+v, %v)", gotKH, err)
 	}
+
+	// SSH Tunnels CRUD & strict owner_user_id isolation.
+	tunnelRepo := sqlite.NewTunnelRepository(store)
+	tun := domain.SSHTunnel{
+		ID:          "tun-1",
+		OwnerUserID: alice.ID,
+		HostID:      aliceHost.ID,
+		Name:        "RDS Postgres Prod",
+		Preset:      domain.TunnelPresetPostgreSQL,
+		LocalHost:   domain.DefaultTunnelLocalHost,
+		LocalPort:   15432,
+		RemoteHost:  "rds.internal",
+		RemotePort:  5432,
+		Notes:       "pgAdmin",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := tunnelRepo.Create(ctx, tun); err != nil {
+		t.Fatalf("Create(tunnel) error = %v", err)
+	}
+	if bobTunnels, err := tunnelRepo.ListByUser(ctx, bob.ID); err != nil || bobTunnels == nil || len(bobTunnels) != 0 {
+		t.Fatalf("Bob ListByUser(tunnels) = (%v, %v), want non-nil empty slice", bobTunnels, err)
+	}
+	if _, err := tunnelRepo.GetByID(ctx, bob.ID, tun.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob GetByID(tunnel) = %v, want ErrNotFound", err)
+	}
+	if err := tunnelRepo.Delete(ctx, bob.ID, tun.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob Delete(tunnel) = %v, want ErrNotFound", err)
+	}
+	if countByHost, err := tunnelRepo.CountByHost(ctx, alice.ID, aliceHost.ID); err != nil || countByHost != 1 {
+		t.Fatalf("CountByHost() = (%d, %v), want (1, nil)", countByHost, err)
+	}
+	tun.LocalPort = 25432
+	tun.UpdatedAt = now.Add(time.Minute)
+	if err := tunnelRepo.Update(ctx, tun); err != nil {
+		t.Fatalf("Alice Update(tunnel) error = %v", err)
+	}
+	gotTun, err := tunnelRepo.GetByID(ctx, alice.ID, tun.ID)
+	if err != nil || gotTun.LocalPort != 25432 {
+		t.Fatalf("Alice GetByID(tunnel) = (%+v, %v)", gotTun, err)
+	}
+	if err := tunnelRepo.Delete(ctx, alice.ID, tun.ID); err != nil {
+		t.Fatalf("Alice Delete(tunnel) error = %v", err)
+	}
 }

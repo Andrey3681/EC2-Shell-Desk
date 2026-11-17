@@ -9,6 +9,8 @@ export interface Dictionary {
   readonly common: Record<string, string>;
   readonly auth: Record<string, string>;
   readonly sidebar: Record<string, string>;
+  readonly tunnels: Record<string, string>;
+  readonly tunnelModal: Record<string, string>;
   readonly hostModal: Record<string, string>;
   readonly vaultModal: Record<string, string>;
   readonly terminal: Record<string, string>;

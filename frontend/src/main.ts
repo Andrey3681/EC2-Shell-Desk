@@ -6,20 +6,27 @@ import { renderInstanceSidebar } from "./components/InstanceSidebar";
 import { openKeyVaultModal } from "./components/KeyVaultModal";
 import { TerminalTabsManager } from "./components/TerminalTabs";
 import { openTofuModal } from "./components/TofuModal";
+import { openTunnelModal } from "./components/TunnelModal";
+import { renderTunnelSidebarBody } from "./components/TunnelSidebar";
 import { XftpDualPane } from "./components/XftpDualPane";
 import { getLocale, setLocale, t, type Locale } from "./i18n";
 import {
   desktopApi,
   type HostInstance,
   type SSHKeySummary,
+  type SSHTunnel,
+  type TunnelRuntimeStatus,
   type UserProfile,
 } from "./services/desktopApi";
 
 const rootEl = document.getElementById("app") as HTMLElement;
 
 let activeUser: UserProfile | null = null;
+let sidebarTab: "hosts" | "tunnels" = "hosts";
 let hosts: HostInstance[] = [];
 let keys: SSHKeySummary[] = [];
+let tunnels: SSHTunnel[] = [];
+const tunnelStatuses = new Map<string, TunnelRuntimeStatus>();
 let searchFilter = "";
 let envFilter = "ALL";
 let terminalMgr: TerminalTabsManager | null = null;
@@ -27,6 +34,18 @@ let xftpPane: XftpDualPane | null = null;
 
 desktopApi.terminal.onTOFUPrompt((challenge) => {
   openTofuModal(challenge);
+});
+
+desktopApi.tunnels.onStatus((status) => {
+  if (status.state === "stopped") {
+    tunnelStatuses.delete(status.tunnelId);
+  } else {
+    tunnelStatuses.set(status.tunnelId, status);
+  }
+  const sidebarBodyEl = rootEl.querySelector<HTMLElement>("#sidebar-body");
+  if (sidebarBodyEl && sidebarTab === "tunnels") {
+    drawSidebarContent(sidebarBodyEl);
+  }
 });
 
 async function bootstrapApp(): Promise<void> {
@@ -49,6 +68,7 @@ function mountAuth(hasUsers: boolean): void {
   xftpPane?.dispose();
   xftpPane = null;
   activeUser = null;
+  tunnelStatuses.clear();
 
   renderAuthView(rootEl, {
     hasUsers,
@@ -64,35 +84,116 @@ function mountAuth(hasUsers: boolean): void {
 
 async function refreshInventory(): Promise<void> {
   try {
-    const [loadedHosts, loadedKeys] = await Promise.all([
-      desktopApi.hosts.list(),
-      desktopApi.keys.list(),
-    ]);
+    const [loadedHosts, loadedKeys, loadedTunnels, loadedStatuses] =
+      await Promise.all([
+        desktopApi.hosts.list(),
+        desktopApi.keys.list(),
+        desktopApi.tunnels.list(),
+        desktopApi.tunnels.listStatuses(),
+      ]);
     hosts = loadedHosts ?? [];
     keys = loadedKeys ?? [];
+    tunnels = loadedTunnels ?? [];
+    tunnelStatuses.clear();
+    for (const st of loadedStatuses ?? []) {
+      tunnelStatuses.set(st.tunnelId, st);
+    }
   } catch (err) {
     hosts = hosts ?? [];
     keys = keys ?? [];
+    tunnels = tunnels ?? [];
     window.alert(extractErrorMessage(err));
   }
+  drawSidebarShell();
+}
+
+function drawSidebarShell(): void {
   const sidebarEl = rootEl.querySelector<HTMLElement>("#sidebar");
-  if (sidebarEl) {
-    drawSidebar(sidebarEl);
+  if (!sidebarEl) return;
+  const copy = t();
+  const activeCount = Array.from(tunnelStatuses.values()).filter(
+    (s) => s.state === "active"
+  ).length;
+
+  sidebarEl.innerHTML = `
+    <div class="sidebar-tabs">
+      <button id="stab-hosts" class="sidebar-tab-btn ${sidebarTab === "hosts" ? "active" : ""}">
+        ${escapeHtml(copy.sidebar.tabInstances)} (${hosts.length})
+      </button>
+      <button id="stab-tunnels" class="sidebar-tab-btn ${sidebarTab === "tunnels" ? "active" : ""}">
+        ${escapeHtml(copy.sidebar.tabTunnels)} (${activeCount > 0 ? `${activeCount}/` : ""}${tunnels.length})
+      </button>
+    </div>
+    <div id="sidebar-body" style="flex:1;min-height:0;display:flex;flex-direction:column;"></div>
+  `;
+
+  sidebarEl.querySelector("#stab-hosts")?.addEventListener("click", () => {
+    sidebarTab = "hosts";
+    drawSidebarShell();
+  });
+  sidebarEl.querySelector("#stab-tunnels")?.addEventListener("click", () => {
+    sidebarTab = "tunnels";
+    drawSidebarShell();
+  });
+
+  const bodyEl = sidebarEl.querySelector<HTMLElement>("#sidebar-body");
+  if (bodyEl) {
+    drawSidebarContent(bodyEl);
   }
 }
 
-function drawSidebar(sidebarEl: HTMLElement): void {
+function drawSidebarContent(bodyEl: HTMLElement): void {
+  if (sidebarTab === "tunnels") {
+    renderTunnelSidebarBody(
+      bodyEl,
+      { tunnels, hosts, statuses: tunnelStatuses },
+      {
+        onNewTunnel: () => {
+          openTunnelModal(null, hosts, () => {
+            void refreshInventory();
+          });
+        },
+        onStartTunnel: (tun) => {
+          void startTunnel(tun);
+        },
+        onStopTunnel: async (tun) => {
+          try {
+            await desktopApi.tunnels.stop(tun.id);
+            await refreshInventory();
+          } catch (err) {
+            window.alert(extractErrorMessage(err));
+          }
+        },
+        onEditTunnel: (tun) => {
+          openTunnelModal(tun, hosts, () => {
+            void refreshInventory();
+          });
+        },
+        onDeleteTunnel: async (tun) => {
+          if (!window.confirm(t().common.confirmDelete)) return;
+          try {
+            await desktopApi.tunnels.delete(tun.id);
+            await refreshInventory();
+          } catch (err) {
+            window.alert(extractErrorMessage(err));
+          }
+        },
+      }
+    );
+    return;
+  }
+
   renderInstanceSidebar(
-    sidebarEl,
+    bodyEl,
     { hosts, keys, search: searchFilter, envFilter },
     {
       onSearchChange: (q) => {
         searchFilter = q;
-        drawSidebar(sidebarEl);
+        drawSidebarContent(bodyEl);
       },
       onEnvFilterChange: (env) => {
         envFilter = env;
-        drawSidebar(sidebarEl);
+        drawSidebarContent(bodyEl);
       },
       onNewHost: () => {
         openHostModal(null, keys, () => {
@@ -109,11 +210,31 @@ function drawSidebar(sidebarEl: HTMLElement): void {
       },
       onDeleteHost: async (host) => {
         if (!window.confirm(t().common.confirmDelete)) return;
-        await desktopApi.hosts.delete(host.id);
-        await refreshInventory();
+        try {
+          await desktopApi.hosts.delete(host.id);
+          await refreshInventory();
+        } catch (err) {
+          window.alert(extractErrorMessage(err));
+        }
       },
     }
   );
+}
+
+async function startTunnel(tun: SSHTunnel): Promise<void> {
+  const bastion = hosts.find((h) => h.id === tun.hostId);
+  let passwordFallback = "";
+  if (bastion && !bastion.sshKeyId) {
+    passwordFallback = window.prompt(t().terminal.passwordPrompt) ?? "";
+  }
+  try {
+    const status = await desktopApi.tunnels.start(tun.id, passwordFallback);
+    tunnelStatuses.set(tun.id, status);
+    drawSidebarShell();
+  } catch (err) {
+    window.alert(extractErrorMessage(err));
+    drawSidebarShell();
+  }
 }
 
 async function connectHost(host: HostInstance): Promise<void> {

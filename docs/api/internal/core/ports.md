@@ -25,6 +25,9 @@ Package ports defines hexagonal port interfaces for persistence, cryptography, S
 - [type SSHConnectRequest](<#SSHConnectRequest>)
 - [type SSHSessionManager](<#SSHSessionManager>)
 - [type TransferProgressFunc](<#TransferProgressFunc>)
+- [type TunnelForwardRequest](<#TunnelForwardRequest>)
+- [type TunnelHandle](<#TunnelHandle>)
+- [type TunnelRepository](<#TunnelRepository>)
 - [type UserRepository](<#UserRepository>)
 
 
@@ -217,13 +220,14 @@ type SSHConnectRequest struct {
 ```
 
 <a name="SSHSessionManager"></a>
-## type [SSHSessionManager](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/ssh_engine.go#L47-L49>)
+## type [SSHSessionManager](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/ssh_engine.go#L72-L75>)
 
-SSHSessionManager establishes authenticated SSH connections and interactive PTY channels.
+SSHSessionManager establishes authenticated SSH connections, interactive PTY channels, and local port forwards.
 
 ```go
 type SSHSessionManager interface {
     ConnectPTY(ctx context.Context, req SSHConnectRequest) (PTYSession, error)
+    StartLocalForward(ctx context.Context, req TunnelForwardRequest) (TunnelHandle, error)
 }
 ```
 
@@ -234,6 +238,59 @@ TransferProgressFunc receives incremental byte counts during an SFTP upload or d
 
 ```go
 type TransferProgressFunc func(bytesTransferred, totalBytes int64)
+```
+
+<a name="TunnelForwardRequest"></a>
+## type [TunnelForwardRequest](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/ssh_engine.go#L47-L58>)
+
+TunnelForwardRequest bundles SSH bastion credentials and local\-to\-remote port forwarding targets.
+
+```go
+type TunnelForwardRequest struct {
+    Host          domain.HostInstance
+    PrivateKeyPEM []byte
+    Passphrase    []byte
+    Password      string
+    LocalHost     string
+    LocalPort     int
+    RemoteHost    string
+    RemotePort    int
+    VerifyHostKey HostKeyVerifier
+    OnTraffic     func(activeConns int, bytesIn, bytesOut int64)
+}
+```
+
+<a name="TunnelHandle"></a>
+## type [TunnelHandle](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/ssh_engine.go#L61-L69>)
+
+TunnelHandle represents an active local TCP port forwarder routed over an authenticated SSH client.
+
+```go
+type TunnelHandle interface {
+    ID() string
+    LocalAddr() string
+    ActiveConnections() int
+    BytesTransferred() (bytesIn, bytesOut int64)
+    Done() <-chan struct{}
+    Err() error
+    Close() error
+}
+```
+
+<a name="TunnelRepository"></a>
+## type [TunnelRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/repository.go#L47-L54>)
+
+TunnelRepository persists SSH port\-forwarding tunnel definitions scoped strictly by owner user ID.
+
+```go
+type TunnelRepository interface {
+    Create(ctx context.Context, tunnel domain.SSHTunnel) error
+    GetByID(ctx context.Context, ownerUserID, tunnelID string) (domain.SSHTunnel, error)
+    ListByUser(ctx context.Context, ownerUserID string) ([]domain.SSHTunnel, error)
+    Update(ctx context.Context, tunnel domain.SSHTunnel) error
+    Delete(ctx context.Context, ownerUserID, tunnelID string) error
+    CountByHost(ctx context.Context, ownerUserID, hostID string) (int, error)
+}
 ```
 
 <a name="UserRepository"></a>

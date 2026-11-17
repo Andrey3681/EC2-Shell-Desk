@@ -280,8 +280,16 @@ func (s *SessionService) ownedSession(sessionID string) (*activeSession, error) 
 }
 
 func (s *SessionService) buildHostKeyVerifier(ownerUserID string, onTrust TOFUTrustPromptFunc) ports.HostKeyVerifier {
+	return newTOFUHostKeyVerifier(s.knownHosts, ownerUserID, onTrust)
+}
+
+func newTOFUHostKeyVerifier(
+	knownHosts ports.KnownHostRepository,
+	ownerUserID string,
+	onTrust TOFUTrustPromptFunc,
+) ports.HostKeyVerifier {
 	return func(ctx context.Context, challenge ports.HostKeyChallenge) error {
-		known, err := s.knownHosts.GetByHostPort(ctx, ownerUserID, challenge.HostAddress, challenge.Port)
+		known, err := knownHosts.GetByHostPort(ctx, ownerUserID, challenge.HostAddress, challenge.Port)
 		if err == nil {
 			if bytes.Equal(known.PublicKeyBlob, challenge.PublicKeyBlob) {
 				return nil
@@ -313,7 +321,7 @@ func (s *SessionService) buildHostKeyVerifier(ownerUserID string, onTrust TOFUTr
 			PublicKeyBlob: append([]byte(nil), challenge.PublicKeyBlob...),
 			TrustedAt:     time.Now().UTC(),
 		}
-		if upsertErr := s.knownHosts.Upsert(ctx, record); upsertErr != nil {
+		if upsertErr := knownHosts.Upsert(ctx, record); upsertErr != nil {
 			return fmt.Errorf("persist trusted host key: %w", upsertErr)
 		}
 		return nil
