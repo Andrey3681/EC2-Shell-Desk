@@ -124,3 +124,25 @@ func TestProjectionsStripSecrets(t *testing.T) {
 		t.Fatalf("unexpected key summary: %+v", summary)
 	}
 }
+
+func TestValidateGroupName(t *testing.T) {
+	tests := []struct {
+		name      string
+		groupName string
+		wantErr   error
+	}{
+		{name: "valid group name", groupName: "Universidad", wantErr: nil},
+		{name: "with spaces", groupName: "Trabajo AWS", wantErr: nil},
+		{name: "empty", groupName: "   ", wantErr: domain.ErrInvalidInput},
+		{name: "too long", groupName: string(make([]byte, domain.MaxGroupNameLength+1)), wantErr: domain.ErrInvalidInput},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := domain.ValidateGroupName(tc.groupName)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("ValidateGroupName(%q) error = %v, want %v", tc.groupName, err, tc.wantErr)
+			}
+		})
+	}
+}

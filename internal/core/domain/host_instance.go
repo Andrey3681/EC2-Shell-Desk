@@ -25,6 +25,7 @@ const DefaultSSHPort = 22
 type HostInstance struct {
 	ID              string      `json:"id"`
 	OwnerUserID     string      `json:"ownerUserId"`
+	GroupID         string      `json:"groupId"`
 	Alias           string      `json:"alias"`
 	HostAddress     string      `json:"hostAddress"`
 	Port            int         `json:"port"`

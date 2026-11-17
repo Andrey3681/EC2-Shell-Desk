@@ -1,6 +1,7 @@
 import "./styles/app.css";
 import { renderAuthView } from "./components/AuthView";
 import { escapeHtml, extractErrorMessage } from "./components/dom";
+import { openGroupModal } from "./components/GroupModal";
 import { openHostModal } from "./components/HostModal";
 import { renderInstanceSidebar } from "./components/InstanceSidebar";
 import { openKeyVaultModal } from "./components/KeyVaultModal";
@@ -10,6 +11,7 @@ import { XftpDualPane } from "./components/XftpDualPane";
 import { getLocale, setLocale, t, type Locale } from "./i18n";
 import {
   desktopApi,
+  type HostGroup,
   type HostInstance,
   type SSHKeySummary,
   type UserProfile,
@@ -19,9 +21,11 @@ const rootEl = document.getElementById("app") as HTMLElement;
 
 let activeUser: UserProfile | null = null;
 let hosts: HostInstance[] = [];
+let groups: HostGroup[] = [];
 let keys: SSHKeySummary[] = [];
 let searchFilter = "";
 let envFilter = "ALL";
+const collapsedGroups = new Set<string>();
 let terminalMgr: TerminalTabsManager | null = null;
 let xftpPane: XftpDualPane | null = null;
 
@@ -49,6 +53,7 @@ function mountAuth(hasUsers: boolean): void {
   xftpPane?.dispose();
   xftpPane = null;
   activeUser = null;
+  collapsedGroups.clear();
 
   renderAuthView(rootEl, {
     hasUsers,
@@ -64,14 +69,17 @@ function mountAuth(hasUsers: boolean): void {
 
 async function refreshInventory(): Promise<void> {
   try {
-    const [loadedHosts, loadedKeys] = await Promise.all([
+    const [loadedHosts, loadedGroups, loadedKeys] = await Promise.all([
       desktopApi.hosts.list(),
+      desktopApi.groups.list(),
       desktopApi.keys.list(),
     ]);
     hosts = loadedHosts ?? [];
+    groups = loadedGroups ?? [];
     keys = loadedKeys ?? [];
   } catch (err) {
     hosts = hosts ?? [];
+    groups = groups ?? [];
     keys = keys ?? [];
     window.alert(extractErrorMessage(err));
   }
@@ -82,9 +90,13 @@ async function refreshInventory(): Promise<void> {
 }
 
 function drawSidebar(sidebarEl: HTMLElement): void {
+  const prevSearch = sidebarEl.querySelector<HTMLInputElement>("#host-search");
+  const hadFocus = document.activeElement === prevSearch;
+  const cursorPos = prevSearch?.selectionStart ?? null;
+
   renderInstanceSidebar(
     sidebarEl,
-    { hosts, keys, search: searchFilter, envFilter },
+    { hosts, groups, keys, search: searchFilter, envFilter, collapsedGroups },
     {
       onSearchChange: (q) => {
         searchFilter = q;
@@ -94,26 +106,73 @@ function drawSidebar(sidebarEl: HTMLElement): void {
         envFilter = env;
         drawSidebar(sidebarEl);
       },
-      onNewHost: () => {
-        openHostModal(null, keys, () => {
+      onToggleGroup: (groupKey) => {
+        if (collapsedGroups.has(groupKey)) {
+          collapsedGroups.delete(groupKey);
+        } else {
+          collapsedGroups.add(groupKey);
+        }
+        drawSidebar(sidebarEl);
+      },
+      onNewGroup: () => {
+        openGroupModal(null, () => {
           void refreshInventory();
         });
+      },
+      onRenameGroup: (group) => {
+        openGroupModal(group, () => {
+          void refreshInventory();
+        });
+      },
+      onDeleteGroup: async (group) => {
+        if (!window.confirm(t().sidebar.deleteGroupConfirm)) return;
+        try {
+          await desktopApi.groups.delete(group.id);
+          await refreshInventory();
+        } catch (err) {
+          window.alert(extractErrorMessage(err));
+        }
+      },
+      onNewHost: (defaultGroupId = "") => {
+        openHostModal(
+          null,
+          keys,
+          groups,
+          () => {
+            void refreshInventory();
+          },
+          defaultGroupId
+        );
       },
       onConnectHost: (host) => {
         void connectHost(host);
       },
       onEditHost: (host) => {
-        openHostModal(host, keys, () => {
+        openHostModal(host, keys, groups, () => {
           void refreshInventory();
         });
       },
       onDeleteHost: async (host) => {
         if (!window.confirm(t().common.confirmDelete)) return;
-        await desktopApi.hosts.delete(host.id);
-        await refreshInventory();
+        try {
+          await desktopApi.hosts.delete(host.id);
+          await refreshInventory();
+        } catch (err) {
+          window.alert(extractErrorMessage(err));
+        }
       },
     }
   );
+
+  if (hadFocus) {
+    const nextSearch = sidebarEl.querySelector<HTMLInputElement>("#host-search");
+    if (nextSearch) {
+      nextSearch.focus();
+      if (cursorPos !== null) {
+        nextSearch.setSelectionRange(cursorPos, cursorPos);
+      }
+    }
+  }
 }
 
 async function connectHost(host: HostInstance): Promise<void> {

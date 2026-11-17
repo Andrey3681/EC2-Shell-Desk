@@ -12,11 +12,13 @@ Package domain defines pure business entities, invariants, and sentinel errors f
 
 - [Constants](<#constants>)
 - [Variables](<#variables>)
+- [func ValidateGroupName\(name string\) error](<#ValidateGroupName>)
 - [func ValidateKeyName\(name string\) error](<#ValidateKeyName>)
 - [func ValidatePassword\(password string\) error](<#ValidatePassword>)
 - [func ValidateUsername\(username string\) error](<#ValidateUsername>)
 - [type Environment](<#Environment>)
 - [type FileEntry](<#FileEntry>)
+- [type HostGroup](<#HostGroup>)
 - [type HostInstance](<#HostInstance>)
   - [func \(h HostInstance\) Validate\(\) error](<#HostInstance.Validate>)
 - [type KeyType](<#KeyType>)
@@ -52,6 +54,12 @@ const (
 
 ```go
 const DefaultSSHPort = 22
+```
+
+<a name="MaxGroupNameLength"></a>MaxGroupNameLength defines the maximum allowed character length for a HostGroup name.
+
+```go
+const MaxGroupNameLength = 64
 ```
 
 ## Variables
@@ -109,6 +117,15 @@ var (
     ErrPathTraversal = errors.New("unsafe path traversal detected")
 )
 ```
+
+<a name="ValidateGroupName"></a>
+## func [ValidateGroupName](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/host_group.go#L22>)
+
+```go
+func ValidateGroupName(name string) error
+```
+
+ValidateGroupName ensures a host group name is non\-empty and within display length limits.
 
 <a name="ValidateKeyName"></a>
 ## func [ValidateKeyName](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/ssh_key.go#L59>)
@@ -175,8 +192,23 @@ type FileEntry struct {
 }
 ```
 
+<a name="HostGroup"></a>
+## type [HostGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/host_group.go#L13-L19>)
+
+HostGroup represents a user\-defined folder or category \(e.g., University, Work, Personal\) for organizing HostInstance records.
+
+```go
+type HostGroup struct {
+    ID          string    `json:"id"`
+    OwnerUserID string    `json:"ownerUserId"`
+    Name        string    `json:"name"`
+    CreatedAt   time.Time `json:"createdAt"`
+    UpdatedAt   time.Time `json:"updatedAt"`
+}
+```
+
 <a name="HostInstance"></a>
-## type [HostInstance](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/host_instance.go#L25-L38>)
+## type [HostInstance](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/host_instance.go#L25-L39>)
 
 HostInstance represents a remote virtual machine or EC2 instance owned by a local user.
 
@@ -184,6 +216,7 @@ HostInstance represents a remote virtual machine or EC2 instance owned by a loca
 type HostInstance struct {
     ID              string      `json:"id"`
     OwnerUserID     string      `json:"ownerUserId"`
+    GroupID         string      `json:"groupId"`
     Alias           string      `json:"alias"`
     HostAddress     string      `json:"hostAddress"`
     Port            int         `json:"port"`
@@ -198,7 +231,7 @@ type HostInstance struct {
 ```
 
 <a name="HostInstance.Validate"></a>
-### func \(HostInstance\) [Validate](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/host_instance.go#L41>)
+### func \(HostInstance\) [Validate](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/host_instance.go#L42>)
 
 ```go
 func (h HostInstance) Validate() error
@@ -229,7 +262,7 @@ const (
 ```
 
 <a name="KnownHost"></a>
-## type [KnownHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/host_instance.go#L68-L77>)
+## type [KnownHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/host_instance.go#L69-L78>)
 
 KnownHost represents a TOFU\-verified SSH host public key pinned for a specific user.
 

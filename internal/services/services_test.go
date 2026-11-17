@@ -68,10 +68,11 @@ func setupPhase2Stack(t *testing.T) (string, *services.AuthService, *services.Va
 	userRepo := sqlite.NewUserRepository(store)
 	keyRepo := sqlite.NewKeyRepository(store)
 	hostRepo := sqlite.NewHostRepository(store)
+	groupRepo := sqlite.NewGroupRepository(store)
 
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo)
 
 	return dbPath, authSvc, vaultSvc, hostSvc
 }
@@ -175,8 +176,13 @@ func TestVaultAndHostMultiUserIsolationEndToEnd(t *testing.T) {
 		t.Fatal("decrypted key or passphrase mismatch")
 	}
 
-	// Alice creates a host bound to her key.
+	// Alice creates a host group and a host bound to her key and group.
+	uniGroup, err := hostSvc.CreateGroup(ctx, "Universidad")
+	if err != nil {
+		t.Fatalf("CreateGroup() error = %v", err)
+	}
 	aliceHost, err := hostSvc.CreateHost(ctx, services.SaveHostInput{
+		GroupID:     uniGroup.ID,
 		Alias:       "Backend API Prod",
 		HostAddress: "54.123.45.67",
 		SSHUsername: "ec2-user",
@@ -187,8 +193,8 @@ func TestVaultAndHostMultiUserIsolationEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateHost() error = %v", err)
 	}
-	if aliceHost.Port != domain.DefaultSSHPort {
-		t.Fatalf("expected default SSH port 22, got %d", aliceHost.Port)
+	if aliceHost.Port != domain.DefaultSSHPort || aliceHost.GroupID != uniGroup.ID {
+		t.Fatalf("expected default SSH port 22 and GroupID %q, got %+v", uniGroup.ID, aliceHost)
 	}
 
 	// Key in use cannot be deleted.
@@ -220,6 +226,20 @@ func TestVaultAndHostMultiUserIsolationEndToEnd(t *testing.T) {
 	}
 	if err := hostSvc.DeleteHost(ctx, aliceHost.ID); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("Bob DeleteHost(aliceHost) = %v, want ErrNotFound", err)
+	}
+	if bobGroups, err := hostSvc.ListGroups(ctx); err != nil || len(bobGroups) != 0 {
+		t.Fatalf("Bob ListGroups() = (%d, %v), want (0, nil)", len(bobGroups), err)
+	}
+	if _, err := hostSvc.CreateHost(ctx, services.SaveHostInput{
+		GroupID:     uniGroup.ID,
+		Alias:       "Cross-User Group",
+		HostAddress: "10.0.0.2",
+		SSHUsername: "ubuntu",
+	}); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob CreateHost with Alice's group = %v, want ErrNotFound", err)
+	}
+	if _, err := hostSvc.RenameGroup(ctx, uniGroup.ID, "Hacked"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob RenameGroup(uniGroup) = %v, want ErrNotFound", err)
 	}
 
 	// Switch back to Alice, update host, verify GetHost, delete host, then delete key cleanly.

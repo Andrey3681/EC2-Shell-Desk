@@ -30,9 +30,13 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
   - [func \(b \*EventBridge\) SetContext\(ctx context.Context\)](<#EventBridge.SetContext>)
 - [type HostHandler](<#HostHandler>)
   - [func NewHostHandler\(bridge \*EventBridge, hosts \*services.HostService\) \*HostHandler](<#NewHostHandler>)
+  - [func \(h \*HostHandler\) CreateGroup\(name string\) \(domain.HostGroup, error\)](<#HostHandler.CreateGroup>)
   - [func \(h \*HostHandler\) CreateHost\(input services.SaveHostInput\) \(domain.HostInstance, error\)](<#HostHandler.CreateHost>)
+  - [func \(h \*HostHandler\) DeleteGroup\(groupID string\) error](<#HostHandler.DeleteGroup>)
   - [func \(h \*HostHandler\) DeleteHost\(hostID string\) error](<#HostHandler.DeleteHost>)
+  - [func \(h \*HostHandler\) ListGroups\(\) \(\[\]domain.HostGroup, error\)](<#HostHandler.ListGroups>)
   - [func \(h \*HostHandler\) ListHosts\(\) \(\[\]domain.HostInstance, error\)](<#HostHandler.ListHosts>)
+  - [func \(h \*HostHandler\) RenameGroup\(groupID, name string\) \(domain.HostGroup, error\)](<#HostHandler.RenameGroup>)
   - [func \(h \*HostHandler\) UpdateHost\(input services.SaveHostInput\) \(domain.HostInstance, error\)](<#HostHandler.UpdateHost>)
 - [type KeyHandler](<#KeyHandler>)
   - [func NewKeyHandler\(bridge \*EventBridge, vault \*services.VaultService\) \*KeyHandler](<#NewKeyHandler>)
@@ -264,6 +268,15 @@ func NewHostHandler(bridge *EventBridge, hosts *services.HostService) *HostHandl
 
 NewHostHandler constructs a HostHandler wired to HostService.
 
+<a name="HostHandler.CreateGroup"></a>
+### func \(\*HostHandler\) [CreateGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/host_handler.go#L48>)
+
+```go
+func (h *HostHandler) CreateGroup(name string) (domain.HostGroup, error)
+```
+
+CreateGroup creates a new host group owned by the active user.
+
 <a name="HostHandler.CreateHost"></a>
 ### func \(\*HostHandler\) [CreateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/host_handler.go#L28>)
 
@@ -272,6 +285,15 @@ func (h *HostHandler) CreateHost(input services.SaveHostInput) (domain.HostInsta
 ```
 
 CreateHost validates and persists a new host instance owned by the active user.
+
+<a name="HostHandler.DeleteGroup"></a>
+### func \(\*HostHandler\) [DeleteGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/host_handler.go#L58>)
+
+```go
+func (h *HostHandler) DeleteGroup(groupID string) error
+```
+
+DeleteGroup removes a host group owned by the active user without deleting its member instances.
 
 <a name="HostHandler.DeleteHost"></a>
 ### func \(\*HostHandler\) [DeleteHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/host_handler.go#L38>)
@@ -282,6 +304,15 @@ func (h *HostHandler) DeleteHost(hostID string) error
 
 DeleteHost removes a host instance owned by the active user.
 
+<a name="HostHandler.ListGroups"></a>
+### func \(\*HostHandler\) [ListGroups](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/host_handler.go#L43>)
+
+```go
+func (h *HostHandler) ListGroups() ([]domain.HostGroup, error)
+```
+
+ListGroups returns all user\-defined host groups owned by the active user.
+
 <a name="HostHandler.ListHosts"></a>
 ### func \(\*HostHandler\) [ListHosts](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/host_handler.go#L23>)
 
@@ -290,6 +321,15 @@ func (h *HostHandler) ListHosts() ([]domain.HostInstance, error)
 ```
 
 ListHosts returns all host instances owned by the active user.
+
+<a name="HostHandler.RenameGroup"></a>
+### func \(\*HostHandler\) [RenameGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/host_handler.go#L53>)
+
+```go
+func (h *HostHandler) RenameGroup(groupID, name string) (domain.HostGroup, error)
+```
+
+RenameGroup renames an existing host group owned by the active user.
 
 <a name="HostHandler.UpdateHost"></a>
 ### func \(\*HostHandler\) [UpdateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/host_handler.go#L33>)

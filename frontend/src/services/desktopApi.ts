@@ -9,6 +9,7 @@ import { EventsOn } from "../../wailsjs/runtime/runtime";
 export type AuthStatus = app.AuthStatus;
 export type UserProfile = domain.UserProfile;
 export type SSHKeySummary = domain.SSHKeySummary;
+export type HostGroup = domain.HostGroup;
 export type HostInstance = domain.HostInstance;
 export type KnownHost = domain.KnownHost;
 export type SessionInfo = domain.SessionInfo;
@@ -63,6 +64,12 @@ export const desktopApi = {
     create: (input: SaveHostInput) => HostHandler.CreateHost(input),
     update: (input: SaveHostInput) => HostHandler.UpdateHost(input),
     delete: (hostId: string) => HostHandler.DeleteHost(hostId),
+  },
+  groups: {
+    list: async () => (await HostHandler.ListGroups()) ?? [],
+    create: (name: string) => HostHandler.CreateGroup(name),
+    rename: (groupId: string, name: string) => HostHandler.RenameGroup(groupId, name),
+    delete: (groupId: string) => HostHandler.DeleteGroup(groupId),
   },
   terminal: {
     openSession: (hostId: string, cols: number, rows: number, passwordFallback: string) =>

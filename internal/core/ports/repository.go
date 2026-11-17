@@ -42,3 +42,12 @@ type KnownHostRepository interface {
 	ListByUser(ctx context.Context, ownerUserID string) ([]domain.KnownHost, error)
 	Delete(ctx context.Context, ownerUserID, knownHostID string) error
 }
+
+// HostGroupRepository persists user-defined host instance groups scoped strictly by owner user ID.
+type HostGroupRepository interface {
+	Create(ctx context.Context, group domain.HostGroup) error
+	GetByID(ctx context.Context, ownerUserID, groupID string) (domain.HostGroup, error)
+	ListByUser(ctx context.Context, ownerUserID string) ([]domain.HostGroup, error)
+	Update(ctx context.Context, group domain.HostGroup) error
+	Delete(ctx context.Context, ownerUserID, groupID string) error
+}

@@ -48,6 +48,7 @@ func Run(assets fs.FS) error {
 	keyRepo := sqlite.NewKeyRepository(store)
 	hostRepo := sqlite.NewHostRepository(store)
 	knownRepo := sqlite.NewKnownHostRepository(store)
+	groupRepo := sqlite.NewGroupRepository(store)
 
 	sshManager := sshclient.NewManager(sftpclient.NewFromSSHClient)
 	localFS := winfs.NewWinFS()
@@ -55,7 +56,7 @@ func Run(assets fs.FS) error {
 
 	authSvc := services.NewAuthService(userRepo, vaultCrypto, vaultCrypto)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vaultCrypto, vaultCrypto)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo)
 	sessionSvc := services.NewSessionService(authSvc, hostRepo, knownRepo, vaultSvc, sshManager, bridge)
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, localFS, bridge)
 

@@ -38,3 +38,23 @@ func (h *HostHandler) UpdateHost(input services.SaveHostInput) (domain.HostInsta
 func (h *HostHandler) DeleteHost(hostID string) error {
 	return h.hosts.DeleteHost(h.bridge.Context(), hostID)
 }
+
+// ListGroups returns all user-defined host groups owned by the active user.
+func (h *HostHandler) ListGroups() ([]domain.HostGroup, error) {
+	return h.hosts.ListGroups(h.bridge.Context())
+}
+
+// CreateGroup creates a new host group owned by the active user.
+func (h *HostHandler) CreateGroup(name string) (domain.HostGroup, error) {
+	return h.hosts.CreateGroup(h.bridge.Context(), name)
+}
+
+// RenameGroup renames an existing host group owned by the active user.
+func (h *HostHandler) RenameGroup(groupID, name string) (domain.HostGroup, error) {
+	return h.hosts.RenameGroup(h.bridge.Context(), groupID, name)
+}
+
+// DeleteGroup removes a host group owned by the active user without deleting its member instances.
+func (h *HostHandler) DeleteGroup(groupID string) error {
+	return h.hosts.DeleteGroup(h.bridge.Context(), groupID)
+}
