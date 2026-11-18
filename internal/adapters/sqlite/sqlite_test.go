@@ -279,4 +279,58 @@ func TestMultiUserIsolationAndCRUD(t *testing.T) {
 	if err != nil || gotAfterGroupDel.GroupID != "" {
 		t.Fatalf("expected ungrouped host after group delete, got (%+v, %v)", gotAfterGroupDel, err)
 	}
+
+	// Command Snippets CRUD, duplicate protection, host scoping, and multi-user isolation.
+	snippetRepo := sqlite.NewSnippetRepository(store)
+	snip := domain.CommandSnippet{
+		ID:          "snip-1",
+		OwnerUserID: alice.ID,
+		HostID:      aliceHost.ID,
+		Name:        "Update Deploy",
+		Command:     "git pull && docker compose up -d",
+		AutoExecute: true,
+		Notes:       "backend update",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := snippetRepo.Create(ctx, snip); err != nil {
+		t.Fatalf("Create(snippet) error = %v", err)
+	}
+	if err := snippetRepo.Create(ctx, snip); !errors.Is(err, domain.ErrDuplicateRecord) {
+		t.Fatalf("duplicate snippet error = %v, want ErrDuplicateRecord", err)
+	}
+	globalSameName := domain.CommandSnippet{
+		ID:          "snip-global-same",
+		OwnerUserID: alice.ID,
+		Name:        "Update Deploy",
+		Command:     "git status",
+		AutoExecute: false,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := snippetRepo.Create(ctx, globalSameName); err != nil {
+		t.Fatalf("Create(global snippet same name) error = %v", err)
+	}
+	if bobSnips, err := snippetRepo.ListByUser(ctx, bob.ID); err != nil || bobSnips == nil || len(bobSnips) != 0 {
+		t.Fatalf("Bob ListByUser(snippets) = (%v, %v), want non-nil empty slice", bobSnips, err)
+	}
+	if _, err := snippetRepo.GetByID(ctx, bob.ID, snip.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob GetByID(snippet) = %v, want ErrNotFound", err)
+	}
+	if err := snippetRepo.Delete(ctx, bob.ID, snip.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob Delete(snippet) = %v, want ErrNotFound", err)
+	}
+	snip.Command = "docker compose pull && docker compose up -d"
+	snip.AutoExecute = false
+	snip.UpdatedAt = now.Add(time.Minute)
+	if err := snippetRepo.Update(ctx, snip); err != nil {
+		t.Fatalf("Alice Update(snippet) error = %v", err)
+	}
+	gotSnip, err := snippetRepo.GetByID(ctx, alice.ID, snip.ID)
+	if err != nil || gotSnip.AutoExecute || gotSnip.Command != snip.Command || gotSnip.HostID != aliceHost.ID {
+		t.Fatalf("Alice GetByID(snippet) = (%+v, %v)", gotSnip, err)
+	}
+	if err := snippetRepo.Delete(ctx, alice.ID, snip.ID); err != nil {
+		t.Fatalf("Alice Delete(snippet) error = %v", err)
+	}
 }
