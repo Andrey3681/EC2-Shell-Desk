@@ -166,7 +166,7 @@ export function openServiceModal(
             <input id="svc-name" class="input" required maxlength="128" value="${escapeHtml(name)}" placeholder="${escapeHtml(curCopy.serviceModal.namePlaceholder)}" />
           </div>
 
-          <div style="display:grid;grid-template-columns:100px 1fr 110px;gap:10px;">
+          <div style="display:grid;grid-template-columns:110px 1fr 130px;gap:10px;">
             <div class="field">
               <label for="svc-protocol">${escapeHtml(curCopy.serviceModal.protocol)}</label>
               <select id="svc-protocol" class="select">
