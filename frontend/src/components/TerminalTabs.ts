@@ -47,6 +47,29 @@ export class TerminalTabsManager {
     return this.activeSessionId;
   }
 
+  public getActiveHostId(): string {
+    return this.tabs.get(this.activeSessionId)?.info.hostId ?? "";
+  }
+
+  public getOpenSessionIds(): string[] {
+    const ids: string[] = [];
+    for (const [id, rec] of this.tabs) {
+      if (!rec.closed) {
+        ids.push(id);
+      }
+    }
+    return ids;
+  }
+
+  public isSessionOpen(sessionId: string): boolean {
+    const rec = this.tabs.get(sessionId);
+    return Boolean(rec && !rec.closed);
+  }
+
+  public focusActive(): void {
+    this.tabs.get(this.activeSessionId)?.term.focus();
+  }
+
   public estimateDimensions(): { cols: number; rows: number } {
     const w = this.stageEl.clientWidth || 800;
     const h = this.stageEl.clientHeight || 420;

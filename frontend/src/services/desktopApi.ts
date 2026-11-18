@@ -2,6 +2,7 @@ import * as AuthHandler from "../../wailsjs/go/app/AuthHandler";
 import * as HostHandler from "../../wailsjs/go/app/HostHandler";
 import * as KeyHandler from "../../wailsjs/go/app/KeyHandler";
 import * as SFTPHandler from "../../wailsjs/go/app/SFTPHandler";
+import * as SnippetHandler from "../../wailsjs/go/app/SnippetHandler";
 import * as TerminalHandler from "../../wailsjs/go/app/TerminalHandler";
 import * as TunnelHandler from "../../wailsjs/go/app/TunnelHandler";
 import { app, domain, services } from "../../wailsjs/go/models";
@@ -18,8 +19,10 @@ export type FileEntry = domain.FileEntry;
 export type TransferTask = domain.TransferTask;
 export type SSHTunnel = domain.SSHTunnel;
 export type TunnelRuntimeStatus = domain.TunnelRuntimeStatus;
+export type CommandSnippet = domain.CommandSnippet;
 export type SaveHostInput = services.SaveHostInput;
 export type SaveTunnelInput = services.SaveTunnelInput;
+export type SaveSnippetInput = services.SaveSnippetInput;
 
 export interface TOFUChallengeEvent {
   requestId: string;
@@ -133,5 +136,15 @@ export const desktopApi = {
     stop: (tunnelId: string) => TunnelHandler.StopTunnel(tunnelId),
     listStatuses: async () => (await TunnelHandler.ListStatuses()) ?? [],
     onStatus: (cb: (status: TunnelRuntimeStatus) => void) => EventsOn("tunnel:status", cb),
+  },
+  snippets: {
+    list: async () => (await SnippetHandler.ListSnippets()) ?? [],
+    create: (input: SaveSnippetInput) => SnippetHandler.CreateSnippet(input),
+    update: (input: SaveSnippetInput) => SnippetHandler.UpdateSnippet(input),
+    delete: (snippetId: string) => SnippetHandler.DeleteSnippet(snippetId),
+    run: (sessionId: string, snippetId: string) =>
+      SnippetHandler.RunSnippetInSession(sessionId, snippetId),
+    broadcast: (sessionIds: string[], snippetId: string) =>
+      SnippetHandler.BroadcastSnippet(sessionIds, snippetId),
   },
 };

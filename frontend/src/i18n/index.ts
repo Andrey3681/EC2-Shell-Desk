@@ -11,6 +11,8 @@ export interface Dictionary {
   readonly sidebar: Record<string, string>;
   readonly tunnels: Record<string, string>;
   readonly tunnelModal: Record<string, string>;
+  readonly snippets: Record<string, string>;
+  readonly snippetModal: Record<string, string>;
   readonly hostModal: Record<string, string>;
   readonly vaultModal: Record<string, string>;
   readonly terminal: Record<string, string>;

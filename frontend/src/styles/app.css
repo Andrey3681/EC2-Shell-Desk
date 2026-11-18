@@ -241,9 +241,24 @@ textarea {
 
 .sidebar-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid var(--border-subtle);
   background: #0f172a;
+}
+
+.snippet-preview {
+  margin-top: 4px;
+  padding: 5px 7px;
+  border-radius: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 54px;
+  overflow: hidden;
 }
 
 .sidebar-tab-btn {

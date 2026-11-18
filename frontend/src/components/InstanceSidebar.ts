@@ -10,6 +10,7 @@ export interface InstanceSidebarState {
   hosts: HostInstance[];
   groups: HostGroup[];
   keys: SSHKeySummary[];
+  snippetCountsByHost?: Map<string, number>;
   search: string;
   envFilter: string;
   collapsedGroups: Set<string>;
@@ -24,6 +25,7 @@ export interface InstanceSidebarCallbacks {
   onDeleteGroup: (group: HostGroup) => void;
   onNewHost: (defaultGroupId?: string) => void;
   onConnectHost: (host: HostInstance) => void;
+  onOpenHostSnippets: (host: HostInstance) => void;
   onEditHost: (host: HostInstance) => void;
   onDeleteHost: (host: HostInstance) => void;
 }
@@ -66,6 +68,7 @@ export function renderInstanceSidebar(
     const keyLabel = h.sshKeyId
       ? (keyNames.get(h.sshKeyId) ?? copy.sidebar.noKeyAssigned)
       : copy.sidebar.noKeyAssigned;
+    const snipCount = state.snippetCountsByHost?.get(h.id) ?? 0;
     return `
       <div class="host-item" data-host-id="${escapeHtml(h.id)}">
         <div class="host-item-top">
@@ -74,8 +77,9 @@ export function renderInstanceSidebar(
         </div>
         <div class="host-item-sub">${escapeHtml(h.sshUsername)}@${escapeHtml(h.hostAddress)}:${h.port}</div>
         <div style="margin-top:3px;font-size:11px;color:var(--text-secondary);">${escapeHtml(keyLabel)}</div>
-        <div class="host-item-actions">
+        <div class="host-item-actions" style="flex-wrap:wrap;">
           <button class="btn btn-success btn-sm" data-action="connect" data-id="${escapeHtml(h.id)}">${escapeHtml(copy.sidebar.connect)}</button>
+          <button class="btn btn-sm" data-action="snippets" data-id="${escapeHtml(h.id)}">${escapeHtml(copy.sidebar.hostSnippets)}${snipCount > 0 ? ` (${snipCount})` : ""}</button>
           <button class="btn btn-sm" data-action="edit" data-id="${escapeHtml(h.id)}">${escapeHtml(copy.common.edit)}</button>
           <button class="btn btn-danger btn-sm" data-action="delete" data-id="${escapeHtml(h.id)}">${escapeHtml(copy.common.delete)}</button>
         </div>
@@ -234,6 +238,7 @@ export function renderInstanceSidebar(
       if (!host) return;
       const action = btn.dataset.action;
       if (action === "connect") cb.onConnectHost(host);
+      if (action === "snippets") cb.onOpenHostSnippets(host);
       if (action === "edit") cb.onEditHost(host);
       if (action === "delete") cb.onDeleteHost(host);
     });
