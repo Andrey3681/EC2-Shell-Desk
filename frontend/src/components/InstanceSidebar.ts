@@ -11,6 +11,7 @@ export interface InstanceSidebarState {
   groups: HostGroup[];
   keys: SSHKeySummary[];
   snippetCountsByHost?: Map<string, number>;
+  serviceCountsByHost?: Map<string, number>;
   search: string;
   envFilter: string;
   collapsedGroups: Set<string>;
@@ -26,6 +27,7 @@ export interface InstanceSidebarCallbacks {
   onNewHost: (defaultGroupId?: string) => void;
   onConnectHost: (host: HostInstance) => void;
   onOpenHostSnippets: (host: HostInstance) => void;
+  onOpenHostServices: (host: HostInstance) => void;
   onEditHost: (host: HostInstance) => void;
   onDeleteHost: (host: HostInstance) => void;
 }
@@ -69,6 +71,7 @@ export function renderInstanceSidebar(
       ? (keyNames.get(h.sshKeyId) ?? copy.sidebar.noKeyAssigned)
       : copy.sidebar.noKeyAssigned;
     const snipCount = state.snippetCountsByHost?.get(h.id) ?? 0;
+    const svcCount = state.serviceCountsByHost?.get(h.id) ?? 0;
     return `
       <div class="host-item" data-host-id="${escapeHtml(h.id)}">
         <div class="host-item-top">
@@ -80,6 +83,7 @@ export function renderInstanceSidebar(
         <div class="host-item-actions" style="flex-wrap:wrap;">
           <button class="btn btn-success btn-sm" data-action="connect" data-id="${escapeHtml(h.id)}">${escapeHtml(copy.sidebar.connect)}</button>
           <button class="btn btn-sm" data-action="snippets" data-id="${escapeHtml(h.id)}">${escapeHtml(copy.sidebar.hostSnippets)}${snipCount > 0 ? ` (${snipCount})` : ""}</button>
+          <button class="btn btn-sm" data-action="services" data-id="${escapeHtml(h.id)}">${escapeHtml(copy.sidebar.hostServices)}${svcCount > 0 ? ` (${svcCount})` : ""}</button>
           <button class="btn btn-sm" data-action="edit" data-id="${escapeHtml(h.id)}">${escapeHtml(copy.common.edit)}</button>
           <button class="btn btn-danger btn-sm" data-action="delete" data-id="${escapeHtml(h.id)}">${escapeHtml(copy.common.delete)}</button>
         </div>
@@ -239,6 +243,7 @@ export function renderInstanceSidebar(
       const action = btn.dataset.action;
       if (action === "connect") cb.onConnectHost(host);
       if (action === "snippets") cb.onOpenHostSnippets(host);
+      if (action === "services") cb.onOpenHostServices(host);
       if (action === "edit") cb.onEditHost(host);
       if (action === "delete") cb.onDeleteHost(host);
     });

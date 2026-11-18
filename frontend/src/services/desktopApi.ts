@@ -1,6 +1,7 @@
 import * as AuthHandler from "../../wailsjs/go/app/AuthHandler";
 import * as HostHandler from "../../wailsjs/go/app/HostHandler";
 import * as KeyHandler from "../../wailsjs/go/app/KeyHandler";
+import * as ObservabilityHandler from "../../wailsjs/go/app/ObservabilityHandler";
 import * as SFTPHandler from "../../wailsjs/go/app/SFTPHandler";
 import * as SnippetHandler from "../../wailsjs/go/app/SnippetHandler";
 import * as TerminalHandler from "../../wailsjs/go/app/TerminalHandler";
@@ -20,9 +21,12 @@ export type TransferTask = domain.TransferTask;
 export type SSHTunnel = domain.SSHTunnel;
 export type TunnelRuntimeStatus = domain.TunnelRuntimeStatus;
 export type CommandSnippet = domain.CommandSnippet;
+export type PrivateService = domain.PrivateService;
+export type ServiceRuntimeStatus = domain.ServiceRuntimeStatus;
 export type SaveHostInput = services.SaveHostInput;
 export type SaveTunnelInput = services.SaveTunnelInput;
 export type SaveSnippetInput = services.SaveSnippetInput;
+export type SaveServiceInput = services.SaveServiceInput;
 
 export interface TOFUChallengeEvent {
   requestId: string;
@@ -146,5 +150,23 @@ export const desktopApi = {
       SnippetHandler.RunSnippetInSession(sessionId, snippetId),
     broadcast: (sessionIds: string[], snippetId: string) =>
       SnippetHandler.BroadcastSnippet(sessionIds, snippetId),
+  },
+  services: {
+    list: async () => (await ObservabilityHandler.ListServices()) ?? [],
+    listByHost: async (hostId: string) =>
+      (await ObservabilityHandler.ListServicesByHost(hostId)) ?? [],
+    create: (input: SaveServiceInput) => ObservabilityHandler.CreateService(input),
+    update: (input: SaveServiceInput) => ObservabilityHandler.UpdateService(input),
+    delete: (serviceId: string) => ObservabilityHandler.DeleteService(serviceId),
+    start: (serviceId: string, passwordFallback: string) =>
+      ObservabilityHandler.StartService(serviceId, passwordFallback),
+    stop: (serviceId: string) => ObservabilityHandler.StopService(serviceId),
+    probe: (serviceId: string) => ObservabilityHandler.ProbeServiceHealth(serviceId),
+    open: (serviceId: string, passwordFallback: string) =>
+      ObservabilityHandler.OpenService(serviceId, passwordFallback),
+    listStatuses: async () =>
+      (await ObservabilityHandler.ListServiceStatuses()) ?? [],
+    onStatus: (cb: (status: ServiceRuntimeStatus) => void) =>
+      EventsOn("service:status", cb),
   },
 };
