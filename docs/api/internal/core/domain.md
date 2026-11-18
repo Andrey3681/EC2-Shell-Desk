@@ -25,11 +25,21 @@ Package domain defines pure business entities, invariants, and sentinel errors f
   - [func \(h HostInstance\) Validate\(\) error](<#HostInstance.Validate>)
 - [type KeyType](<#KeyType>)
 - [type KnownHost](<#KnownHost>)
+- [type PrivateService](<#PrivateService>)
+  - [func \(s PrivateService\) NormalizedBasePath\(\) string](<#PrivateService.NormalizedBasePath>)
+  - [func \(s PrivateService\) NormalizedHealthPath\(\) string](<#PrivateService.NormalizedHealthPath>)
+  - [func \(s PrivateService\) URL\(localPort int\) string](<#PrivateService.URL>)
+  - [func \(s PrivateService\) Validate\(\) error](<#PrivateService.Validate>)
 - [type SSHKey](<#SSHKey>)
   - [func \(k SSHKey\) Summary\(\) SSHKeySummary](<#SSHKey.Summary>)
 - [type SSHKeySummary](<#SSHKeySummary>)
 - [type SSHTunnel](<#SSHTunnel>)
   - [func \(t SSHTunnel\) Validate\(\) error](<#SSHTunnel.Validate>)
+- [type ServiceHealthStatus](<#ServiceHealthStatus>)
+- [type ServiceOpenMode](<#ServiceOpenMode>)
+- [type ServicePreset](<#ServicePreset>)
+- [type ServiceProtocol](<#ServiceProtocol>)
+- [type ServiceRuntimeStatus](<#ServiceRuntimeStatus>)
 - [type SessionInfo](<#SessionInfo>)
 - [type TransferDirection](<#TransferDirection>)
 - [type TransferState](<#TransferState>)
@@ -84,6 +94,12 @@ const DefaultTunnelLocalHost = "127.0.0.1"
 
 ```go
 const MaxGroupNameLength = 64
+```
+
+<a name="MaxServiceNameLength"></a>MaxServiceNameLength defines max character length for private service names.
+
+```go
+const MaxServiceNameLength = 128
 ```
 
 ## Variables
@@ -341,6 +357,67 @@ type KnownHost struct {
 }
 ```
 
+<a name="PrivateService"></a>
+## type [PrivateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L70-L86>)
+
+PrivateService represents a user\-configured internal web service running on an EC2 instance / VM.
+
+```go
+type PrivateService struct {
+    ID          string          `json:"id"`
+    OwnerUserID string          `json:"ownerUserId"`
+    HostID      string          `json:"hostId"`
+    Name        string          `json:"name"`
+    Preset      ServicePreset   `json:"preset"`
+    Protocol    ServiceProtocol `json:"protocol"`
+    RemoteHost  string          `json:"remoteHost"`
+    RemotePort  int             `json:"remotePort"`
+    BasePath    string          `json:"basePath"`
+    LocalPort   int             `json:"localPort"`
+    HealthPath  string          `json:"healthPath"`
+    OpenMode    ServiceOpenMode `json:"openMode"`
+    Notes       string          `json:"notes"`
+    CreatedAt   time.Time       `json:"createdAt"`
+    UpdatedAt   time.Time       `json:"updatedAt"`
+}
+```
+
+<a name="PrivateService.NormalizedBasePath"></a>
+### func \(PrivateService\) [NormalizedBasePath](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L137>)
+
+```go
+func (s PrivateService) NormalizedBasePath() string
+```
+
+NormalizedBasePath returns sanitized base path starting with / or empty string if root.
+
+<a name="PrivateService.NormalizedHealthPath"></a>
+### func \(PrivateService\) [NormalizedHealthPath](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L149>)
+
+```go
+func (s PrivateService) NormalizedHealthPath() string
+```
+
+NormalizedHealthPath returns the effective health probe path.
+
+<a name="PrivateService.URL"></a>
+### func \(PrivateService\) [URL](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L179>)
+
+```go
+func (s PrivateService) URL(localPort int) string
+```
+
+URL constructs a full loopback URL for the service based on local bind port and base path.
+
+<a name="PrivateService.Validate"></a>
+### func \(PrivateService\) [Validate](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L89>)
+
+```go
+func (s PrivateService) Validate() error
+```
+
+Validate verifies constraints for PrivateService fields.
+
 <a name="SSHKey"></a>
 ## type [SSHKey](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/ssh_key.go#L22-L32>)
 
@@ -416,6 +493,122 @@ func (t SSHTunnel) Validate() error
 ```
 
 Validate checks that required SSHTunnel fields, ports, and endpoints are valid.
+
+<a name="ServiceHealthStatus"></a>
+## type [ServiceHealthStatus](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L53>)
+
+ServiceHealthStatus reflects the HTTP probe result.
+
+```go
+type ServiceHealthStatus string
+```
+
+<a name="ServiceHealthUnknown"></a>
+
+```go
+const (
+    // ServiceHealthUnknown indicates the service has not been probed yet.
+    ServiceHealthUnknown ServiceHealthStatus = "unknown"
+    // ServiceHealthHealthy indicates the probe returned an expected successful HTTP response (e.g. 2xx/3xx).
+    ServiceHealthHealthy ServiceHealthStatus = "healthy"
+    // ServiceHealthDegraded indicates non-terminal status or unexpected response code.
+    ServiceHealthDegraded ServiceHealthStatus = "degraded"
+    // ServiceHealthUnhealthy indicates connection refused or error.
+    ServiceHealthUnhealthy ServiceHealthStatus = "unhealthy"
+)
+```
+
+<a name="ServiceOpenMode"></a>
+## type [ServiceOpenMode](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L43>)
+
+ServiceOpenMode defines where the service is displayed.
+
+```go
+type ServiceOpenMode string
+```
+
+<a name="ServiceOpenModeBrowser"></a>
+
+```go
+const (
+    // ServiceOpenModeBrowser opens the service in the default external system browser.
+    ServiceOpenModeBrowser ServiceOpenMode = "browser"
+    // ServiceOpenModeEmbedded opens the service in an internal desktop application tab.
+    ServiceOpenModeEmbedded ServiceOpenMode = "embedded"
+)
+```
+
+<a name="ServicePreset"></a>
+## type [ServicePreset](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L11>)
+
+ServicePreset defines predefined templates for observability and web services.
+
+```go
+type ServicePreset string
+```
+
+<a name="ServicePresetGrafana"></a>
+
+```go
+const (
+    // ServicePresetGrafana identifies Grafana dashboard service.
+    ServicePresetGrafana ServicePreset = "grafana"
+    // ServicePresetPrometheus identifies Prometheus metrics server.
+    ServicePresetPrometheus ServicePreset = "prometheus"
+    // ServicePresetLoki identifies Grafana Loki log aggregation API.
+    ServicePresetLoki ServicePreset = "loki"
+    // ServicePresetMailpit identifies Mailpit / MailHog email testing UI.
+    ServicePresetMailpit ServicePreset = "mailpit"
+    // ServicePresetPortainer identifies Portainer container management UI.
+    ServicePresetPortainer ServicePreset = "portainer"
+    // ServicePresetNetdata identifies Netdata real-time monitoring agent.
+    ServicePresetNetdata ServicePreset = "netdata"
+    // ServicePresetUptimeKuma identifies Uptime Kuma monitoring tool.
+    ServicePresetUptimeKuma ServicePreset = "uptime_kuma"
+    // ServicePresetCustom identifies user-defined web services.
+    ServicePresetCustom ServicePreset = "custom"
+)
+```
+
+<a name="ServiceProtocol"></a>
+## type [ServiceProtocol](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L33>)
+
+ServiceProtocol defines the communication scheme \(http or https\).
+
+```go
+type ServiceProtocol string
+```
+
+<a name="ServiceProtocolHTTP"></a>
+
+```go
+const (
+    // ServiceProtocolHTTP represents cleartext HTTP.
+    ServiceProtocolHTTP ServiceProtocol = "http"
+    // ServiceProtocolHTTPS represents secure HTTP.
+    ServiceProtocolHTTPS ServiceProtocol = "https"
+)
+```
+
+<a name="ServiceRuntimeStatus"></a>
+## type [ServiceRuntimeStatus](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L165-L176>)
+
+ServiceRuntimeStatus represents real\-time operational state of a private service tunnel.
+
+```go
+type ServiceRuntimeStatus struct {
+    ServiceID    string              `json:"serviceId"`
+    OwnerUserID  string              `json:"ownerUserId"`
+    State        TunnelState         `json:"state"`
+    LocalURL     string              `json:"localUrl"`
+    LocalPort    int                 `json:"localPort"`
+    HealthStatus ServiceHealthStatus `json:"healthStatus"`
+    HTTPStatus   int                 `json:"httpStatus"`
+    LatencyMs    int64               `json:"latencyMs"`
+    ErrorMessage string              `json:"errorMessage,omitempty"`
+    LastChecked  *time.Time          `json:"lastChecked,omitempty"`
+}
+```
 
 <a name="SessionInfo"></a>
 ## type [SessionInfo](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/session.go#L6-L15>)

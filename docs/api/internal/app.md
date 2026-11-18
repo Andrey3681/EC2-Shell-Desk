@@ -11,7 +11,7 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
 ## Index
 
 - [type AuthHandler](<#AuthHandler>)
-  - [func NewAuthHandler\(bridge \*EventBridge, auth \*services.AuthService, sessions \*services.SessionService, transfers \*services.TransferService, tunnels \*services.TunnelService\) \*AuthHandler](<#NewAuthHandler>)
+  - [func NewAuthHandler\(bridge \*EventBridge, auth \*services.AuthService, sessions \*services.SessionService, transfers \*services.TransferService, tunnels \*services.TunnelService, observability \*services.ObservabilityService\) \*AuthHandler](<#NewAuthHandler>)
   - [func \(h \*AuthHandler\) BootstrapInitialUser\(username, password string\) \(domain.UserProfile, error\)](<#AuthHandler.BootstrapInitialUser>)
   - [func \(h \*AuthHandler\) CreateUser\(username, password string\) \(domain.UserProfile, error\)](<#AuthHandler.CreateUser>)
   - [func \(h \*AuthHandler\) ListUsers\(\) \(\[\]domain.UserProfile, error\)](<#AuthHandler.ListUsers>)
@@ -22,6 +22,7 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
 - [type EventBridge](<#EventBridge>)
   - [func NewEventBridge\(\) \*EventBridge](<#NewEventBridge>)
   - [func \(b \*EventBridge\) Context\(\) context.Context](<#EventBridge.Context>)
+  - [func \(b \*EventBridge\) OnServiceStatusChanged\(status domain.ServiceRuntimeStatus\)](<#EventBridge.OnServiceStatusChanged>)
   - [func \(b \*EventBridge\) OnTerminalClosed\(sessionID, reason string\)](<#EventBridge.OnTerminalClosed>)
   - [func \(b \*EventBridge\) OnTerminalData\(sessionID string, data \[\]byte\)](<#EventBridge.OnTerminalData>)
   - [func \(b \*EventBridge\) OnTransferProgress\(task domain.TransferTask\)](<#EventBridge.OnTransferProgress>)
@@ -46,6 +47,18 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
   - [func \(h \*KeyHandler\) ImportKeyFromFile\(name, filePath, passphrase string\) \(domain.SSHKeySummary, error\)](<#KeyHandler.ImportKeyFromFile>)
   - [func \(h \*KeyHandler\) ListKeys\(\) \(\[\]domain.SSHKeySummary, error\)](<#KeyHandler.ListKeys>)
   - [func \(h \*KeyHandler\) PickKeyFile\(\) \(string, error\)](<#KeyHandler.PickKeyFile>)
+- [type ObservabilityHandler](<#ObservabilityHandler>)
+  - [func NewObservabilityHandler\(bridge \*EventBridge, services \*services.ObservabilityService\) \*ObservabilityHandler](<#NewObservabilityHandler>)
+  - [func \(h \*ObservabilityHandler\) CreateService\(input services.SaveServiceInput\) \(domain.PrivateService, error\)](<#ObservabilityHandler.CreateService>)
+  - [func \(h \*ObservabilityHandler\) DeleteService\(serviceID string\) error](<#ObservabilityHandler.DeleteService>)
+  - [func \(h \*ObservabilityHandler\) ListServiceStatuses\(\) \(\[\]domain.ServiceRuntimeStatus, error\)](<#ObservabilityHandler.ListServiceStatuses>)
+  - [func \(h \*ObservabilityHandler\) ListServices\(\) \(\[\]domain.PrivateService, error\)](<#ObservabilityHandler.ListServices>)
+  - [func \(h \*ObservabilityHandler\) ListServicesByHost\(hostID string\) \(\[\]domain.PrivateService, error\)](<#ObservabilityHandler.ListServicesByHost>)
+  - [func \(h \*ObservabilityHandler\) OpenService\(serviceID, passwordFallback string\) \(domain.ServiceRuntimeStatus, error\)](<#ObservabilityHandler.OpenService>)
+  - [func \(h \*ObservabilityHandler\) ProbeServiceHealth\(serviceID string\) domain.ServiceRuntimeStatus](<#ObservabilityHandler.ProbeServiceHealth>)
+  - [func \(h \*ObservabilityHandler\) StartService\(serviceID, passwordFallback string\) \(domain.ServiceRuntimeStatus, error\)](<#ObservabilityHandler.StartService>)
+  - [func \(h \*ObservabilityHandler\) StopService\(serviceID string\) error](<#ObservabilityHandler.StopService>)
+  - [func \(h \*ObservabilityHandler\) UpdateService\(input services.SaveServiceInput\) \(domain.PrivateService, error\)](<#ObservabilityHandler.UpdateService>)
 - [type SFTPHandler](<#SFTPHandler>)
   - [func NewSFTPHandler\(bridge \*EventBridge, transfers \*services.TransferService\) \*SFTPHandler](<#NewSFTPHandler>)
   - [func \(h \*SFTPHandler\) CancelTransfer\(transferID string\) error](<#SFTPHandler.CancelTransfer>)
@@ -97,7 +110,7 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
 
 
 <a name="AuthHandler"></a>
-## type [AuthHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L19-L25>)
+## type [AuthHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L19-L26>)
 
 AuthHandler exposes local authentication and multi\-user session lifecycle bindings to Wails.
 
@@ -108,16 +121,16 @@ type AuthHandler struct {
 ```
 
 <a name="NewAuthHandler"></a>
-### func [NewAuthHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L28-L34>)
+### func [NewAuthHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L29-L36>)
 
 ```go
-func NewAuthHandler(bridge *EventBridge, auth *services.AuthService, sessions *services.SessionService, transfers *services.TransferService, tunnels *services.TunnelService) *AuthHandler
+func NewAuthHandler(bridge *EventBridge, auth *services.AuthService, sessions *services.SessionService, transfers *services.TransferService, tunnels *services.TunnelService, observability *services.ObservabilityService) *AuthHandler
 ```
 
 NewAuthHandler constructs an AuthHandler wired to authentication and active session lifecycles.
 
 <a name="AuthHandler.BootstrapInitialUser"></a>
-### func \(\*AuthHandler\) [BootstrapInitialUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L71>)
+### func \(\*AuthHandler\) [BootstrapInitialUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L74>)
 
 ```go
 func (h *AuthHandler) BootstrapInitialUser(username, password string) (domain.UserProfile, error)
@@ -126,7 +139,7 @@ func (h *AuthHandler) BootstrapInitialUser(username, password string) (domain.Us
 BootstrapInitialUser creates the first local user and unlocks their encrypted vault.
 
 <a name="AuthHandler.CreateUser"></a>
-### func \(\*AuthHandler\) [CreateUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L76>)
+### func \(\*AuthHandler\) [CreateUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L79>)
 
 ```go
 func (h *AuthHandler) CreateUser(username, password string) (domain.UserProfile, error)
@@ -135,7 +148,7 @@ func (h *AuthHandler) CreateUser(username, password string) (domain.UserProfile,
 CreateUser registers an additional isolated local user account.
 
 <a name="AuthHandler.ListUsers"></a>
-### func \(\*AuthHandler\) [ListUsers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L66>)
+### func \(\*AuthHandler\) [ListUsers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L69>)
 
 ```go
 func (h *AuthHandler) ListUsers() ([]domain.UserProfile, error)
@@ -144,7 +157,7 @@ func (h *AuthHandler) ListUsers() ([]domain.UserProfile, error)
 ListUsers returns safe public profiles for all configured local users.
 
 <a name="AuthHandler.Lock"></a>
-### func \(\*AuthHandler\) [Lock](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L95>)
+### func \(\*AuthHandler\) [Lock](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L101>)
 
 ```go
 func (h *AuthHandler) Lock()
@@ -153,7 +166,7 @@ func (h *AuthHandler) Lock()
 Lock terminates active SSH/SFTP sessions and tunnels and wipes the unlocked master key from memory.
 
 <a name="AuthHandler.Login"></a>
-### func \(\*AuthHandler\) [Login](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L81>)
+### func \(\*AuthHandler\) [Login](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L84>)
 
 ```go
 func (h *AuthHandler) Login(username, password string) (domain.UserProfile, error)
@@ -162,7 +175,7 @@ func (h *AuthHandler) Login(username, password string) (domain.UserProfile, erro
 Login authenticates a user and switches the unlocked vault session, closing prior user sessions first.
 
 <a name="AuthHandler.Status"></a>
-### func \(\*AuthHandler\) [Status](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L45>)
+### func \(\*AuthHandler\) [Status](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/auth_handler.go#L48>)
 
 ```go
 func (h *AuthHandler) Status() (AuthStatus, error)
@@ -212,6 +225,15 @@ func (b *EventBridge) Context() context.Context
 
 Context returns the bound Wails runtime context, or context.Background\(\) in unit tests.
 
+<a name="EventBridge.OnServiceStatusChanged"></a>
+### func \(\*EventBridge\) [OnServiceStatusChanged](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L116>)
+
+```go
+func (b *EventBridge) OnServiceStatusChanged(status domain.ServiceRuntimeStatus)
+```
+
+OnServiceStatusChanged emits private service status changes and health results to the desktop UI.
+
 <a name="EventBridge.OnTerminalClosed"></a>
 ### func \(\*EventBridge\) [OnTerminalClosed](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L80>)
 
@@ -249,7 +271,7 @@ func (b *EventBridge) OnTunnelStatusChanged(status domain.TunnelRuntimeStatus)
 OnTunnelStatusChanged emits live SSH tunnel state and traffic updates to the frontend.
 
 <a name="EventBridge.RequestTOFUTrust"></a>
-### func \(\*EventBridge\) [RequestTOFUTrust](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L116>)
+### func \(\*EventBridge\) [RequestTOFUTrust](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L127>)
 
 ```go
 func (b *EventBridge) RequestTOFUTrust(ctx context.Context, challenge ports.HostKeyChallenge) (bool, error)
@@ -258,7 +280,7 @@ func (b *EventBridge) RequestTOFUTrust(ctx context.Context, challenge ports.Host
 RequestTOFUTrust emits a host key fingerprint prompt to the UI and waits for the user's decision.
 
 <a name="EventBridge.ResolveTOFU"></a>
-### func \(\*EventBridge\) [ResolveTOFU](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L159>)
+### func \(\*EventBridge\) [ResolveTOFU](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L170>)
 
 ```go
 func (b *EventBridge) ResolveTOFU(requestID string, trusted bool) error
@@ -431,6 +453,116 @@ func (h *KeyHandler) PickKeyFile() (string, error)
 ```
 
 PickKeyFile opens a native Windows file dialog to select an SSH private key file.
+
+<a name="ObservabilityHandler"></a>
+## type [ObservabilityHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L13-L16>)
+
+ObservabilityHandler exposes private service management and browser launching bindings to Wails.
+
+```go
+type ObservabilityHandler struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewObservabilityHandler"></a>
+### func [NewObservabilityHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L19>)
+
+```go
+func NewObservabilityHandler(bridge *EventBridge, services *services.ObservabilityService) *ObservabilityHandler
+```
+
+NewObservabilityHandler constructs an ObservabilityHandler wired to ObservabilityService.
+
+<a name="ObservabilityHandler.CreateService"></a>
+### func \(\*ObservabilityHandler\) [CreateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L37>)
+
+```go
+func (h *ObservabilityHandler) CreateService(input services.SaveServiceInput) (domain.PrivateService, error)
+```
+
+CreateService validates and stores a new private service.
+
+<a name="ObservabilityHandler.DeleteService"></a>
+### func \(\*ObservabilityHandler\) [DeleteService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L47>)
+
+```go
+func (h *ObservabilityHandler) DeleteService(serviceID string) error
+```
+
+DeleteService removes a stopped private service.
+
+<a name="ObservabilityHandler.ListServiceStatuses"></a>
+### func \(\*ObservabilityHandler\) [ListServiceStatuses](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L72>)
+
+```go
+func (h *ObservabilityHandler) ListServiceStatuses() ([]domain.ServiceRuntimeStatus, error)
+```
+
+ListServiceStatuses returns runtime statuses of active services for the current user.
+
+<a name="ObservabilityHandler.ListServices"></a>
+### func \(\*ObservabilityHandler\) [ListServices](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L27>)
+
+```go
+func (h *ObservabilityHandler) ListServices() ([]domain.PrivateService, error)
+```
+
+ListServices returns saved private services owned by the active user.
+
+<a name="ObservabilityHandler.ListServicesByHost"></a>
+### func \(\*ObservabilityHandler\) [ListServicesByHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L32>)
+
+```go
+func (h *ObservabilityHandler) ListServicesByHost(hostID string) ([]domain.PrivateService, error)
+```
+
+ListServicesByHost returns saved private services for a specific host.
+
+<a name="ObservabilityHandler.OpenService"></a>
+### func \(\*ObservabilityHandler\) [OpenService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L77>)
+
+```go
+func (h *ObservabilityHandler) OpenService(serviceID, passwordFallback string) (domain.ServiceRuntimeStatus, error)
+```
+
+OpenService ensures the service tunnel is active and launches it in the system browser.
+
+<a name="ObservabilityHandler.ProbeServiceHealth"></a>
+### func \(\*ObservabilityHandler\) [ProbeServiceHealth](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L67>)
+
+```go
+func (h *ObservabilityHandler) ProbeServiceHealth(serviceID string) domain.ServiceRuntimeStatus
+```
+
+ProbeServiceHealth runs an immediate HTTP probe against the service.
+
+<a name="ObservabilityHandler.StartService"></a>
+### func \(\*ObservabilityHandler\) [StartService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L52>)
+
+```go
+func (h *ObservabilityHandler) StartService(serviceID, passwordFallback string) (domain.ServiceRuntimeStatus, error)
+```
+
+StartService dials the host instance, opens the local port forward, checks health, and returns status.
+
+<a name="ObservabilityHandler.StopService"></a>
+### func \(\*ObservabilityHandler\) [StopService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L62>)
+
+```go
+func (h *ObservabilityHandler) StopService(serviceID string) error
+```
+
+StopService closes the local tunnel for the private service.
+
+<a name="ObservabilityHandler.UpdateService"></a>
+### func \(\*ObservabilityHandler\) [UpdateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L42>)
+
+```go
+func (h *ObservabilityHandler) UpdateService(input services.SaveServiceInput) (domain.PrivateService, error)
+```
+
+UpdateService modifies a stopped private service.
 
 <a name="SFTPHandler"></a>
 ## type [SFTPHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L15-L18>)

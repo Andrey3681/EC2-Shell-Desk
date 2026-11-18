@@ -38,6 +38,15 @@ Package sqlite implements repository ports using pure\-Go SQLite persistence wit
   - [func \(r \*KnownHostRepository\) GetByHostPort\(ctx context.Context, ownerUserID, hostAddress string, port int\) \(domain.KnownHost, error\)](<#KnownHostRepository.GetByHostPort>)
   - [func \(r \*KnownHostRepository\) ListByUser\(ctx context.Context, ownerUserID string\) \(\[\]domain.KnownHost, error\)](<#KnownHostRepository.ListByUser>)
   - [func \(r \*KnownHostRepository\) Upsert\(ctx context.Context, knownHost domain.KnownHost\) error](<#KnownHostRepository.Upsert>)
+- [type ServiceRepository](<#ServiceRepository>)
+  - [func NewServiceRepository\(store \*Store\) \*ServiceRepository](<#NewServiceRepository>)
+  - [func \(r \*ServiceRepository\) CountByHost\(ctx context.Context, ownerUserID, hostID string\) \(int, error\)](<#ServiceRepository.CountByHost>)
+  - [func \(r \*ServiceRepository\) Create\(ctx context.Context, service domain.PrivateService\) error](<#ServiceRepository.Create>)
+  - [func \(r \*ServiceRepository\) Delete\(ctx context.Context, ownerUserID, serviceID string\) error](<#ServiceRepository.Delete>)
+  - [func \(r \*ServiceRepository\) GetByID\(ctx context.Context, ownerUserID, serviceID string\) \(domain.PrivateService, error\)](<#ServiceRepository.GetByID>)
+  - [func \(r \*ServiceRepository\) ListByHost\(ctx context.Context, ownerUserID, hostID string\) \(\[\]domain.PrivateService, error\)](<#ServiceRepository.ListByHost>)
+  - [func \(r \*ServiceRepository\) ListByUser\(ctx context.Context, ownerUserID string\) \(\[\]domain.PrivateService, error\)](<#ServiceRepository.ListByUser>)
+  - [func \(r \*ServiceRepository\) Update\(ctx context.Context, service domain.PrivateService\) error](<#ServiceRepository.Update>)
 - [type SnippetRepository](<#SnippetRepository>)
   - [func NewSnippetRepository\(store \*Store\) \*SnippetRepository](<#NewSnippetRepository>)
   - [func \(r \*SnippetRepository\) Create\(ctx context.Context, snippet domain.CommandSnippet\) error](<#SnippetRepository.Create>)
@@ -324,6 +333,89 @@ func (r *KnownHostRepository) Upsert(ctx context.Context, knownHost domain.Known
 ```
 
 Upsert stores or updates a trusted host public key fingerprint for a specific user.
+
+<a name="ServiceRepository"></a>
+## type [ServiceRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/service_repo.go#L13-L15>)
+
+ServiceRepository implements ports.ServiceRepository backed by SQLite with strict owner\_user\_id isolation.
+
+```go
+type ServiceRepository struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewServiceRepository"></a>
+### func [NewServiceRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/service_repo.go#L18>)
+
+```go
+func NewServiceRepository(store *Store) *ServiceRepository
+```
+
+NewServiceRepository creates a ServiceRepository using the provided SQLite Store.
+
+<a name="ServiceRepository.CountByHost"></a>
+### func \(\*ServiceRepository\) [CountByHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/service_repo.go#L198>)
+
+```go
+func (r *ServiceRepository) CountByHost(ctx context.Context, ownerUserID, hostID string) (int, error)
+```
+
+CountByHost returns how many services are associated with a host instance.
+
+<a name="ServiceRepository.Create"></a>
+### func \(\*ServiceRepository\) [Create](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/service_repo.go#L23>)
+
+```go
+func (r *ServiceRepository) Create(ctx context.Context, service domain.PrivateService) error
+```
+
+Create inserts a new PrivateService owned by service.OwnerUserID.
+
+<a name="ServiceRepository.Delete"></a>
+### func \(\*ServiceRepository\) [Delete](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/service_repo.go#L181>)
+
+```go
+func (r *ServiceRepository) Delete(ctx context.Context, ownerUserID, serviceID string) error
+```
+
+Delete removes a PrivateService only if owned by ownerUserID.
+
+<a name="ServiceRepository.GetByID"></a>
+### func \(\*ServiceRepository\) [GetByID](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/service_repo.go#L59>)
+
+```go
+func (r *ServiceRepository) GetByID(ctx context.Context, ownerUserID, serviceID string) (domain.PrivateService, error)
+```
+
+GetByID retrieves a PrivateService only if it belongs to ownerUserID.
+
+<a name="ServiceRepository.ListByHost"></a>
+### func \(\*ServiceRepository\) [ListByHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/service_repo.go#L108>)
+
+```go
+func (r *ServiceRepository) ListByHost(ctx context.Context, ownerUserID, hostID string) ([]domain.PrivateService, error)
+```
+
+ListByHost returns PrivateService records belonging to a specific host and owner.
+
+<a name="ServiceRepository.ListByUser"></a>
+### func \(\*ServiceRepository\) [ListByUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/service_repo.go#L77>)
+
+```go
+func (r *ServiceRepository) ListByUser(ctx context.Context, ownerUserID string) ([]domain.PrivateService, error)
+```
+
+ListByUser returns all PrivateService records belonging strictly to ownerUserID.
+
+<a name="ServiceRepository.Update"></a>
+### func \(\*ServiceRepository\) [Update](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/service_repo.go#L139>)
+
+```go
+func (r *ServiceRepository) Update(ctx context.Context, service domain.PrivateService) error
+```
+
+Update modifies an existing PrivateService only if owned by service.OwnerUserID.
 
 <a name="SnippetRepository"></a>
 ## type [SnippetRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/snippet_repo.go#L13-L15>)

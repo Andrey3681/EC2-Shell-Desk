@@ -25,6 +25,7 @@ Package ports defines hexagonal port interfaces for persistence, cryptography, S
 - [type SFTPClient](<#SFTPClient>)
 - [type SSHConnectRequest](<#SSHConnectRequest>)
 - [type SSHSessionManager](<#SSHSessionManager>)
+- [type ServiceRepository](<#ServiceRepository>)
 - [type SnippetRepository](<#SnippetRepository>)
 - [type TransferProgressFunc](<#TransferProgressFunc>)
 - [type TunnelForwardRequest](<#TunnelForwardRequest>)
@@ -245,6 +246,23 @@ SSHSessionManager establishes authenticated SSH connections, interactive PTY cha
 type SSHSessionManager interface {
     ConnectPTY(ctx context.Context, req SSHConnectRequest) (PTYSession, error)
     StartLocalForward(ctx context.Context, req TunnelForwardRequest) (TunnelHandle, error)
+}
+```
+
+<a name="ServiceRepository"></a>
+## type [ServiceRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/repository.go#L75-L83>)
+
+ServiceRepository persists private observability and web services scoped strictly by owner user ID.
+
+```go
+type ServiceRepository interface {
+    Create(ctx context.Context, service domain.PrivateService) error
+    GetByID(ctx context.Context, ownerUserID, serviceID string) (domain.PrivateService, error)
+    ListByUser(ctx context.Context, ownerUserID string) ([]domain.PrivateService, error)
+    ListByHost(ctx context.Context, ownerUserID, hostID string) ([]domain.PrivateService, error)
+    Update(ctx context.Context, service domain.PrivateService) error
+    Delete(ctx context.Context, ownerUserID, serviceID string) error
+    CountByHost(ctx context.Context, ownerUserID, hostID string) (int, error)
 }
 ```
 

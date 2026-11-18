@@ -31,9 +31,23 @@ Package services implements application use cases orchestrating authentication, 
   - [func \(s \*HostService\) ListHosts\(ctx context.Context\) \(\[\]domain.HostInstance, error\)](<#HostService.ListHosts>)
   - [func \(s \*HostService\) RenameGroup\(ctx context.Context, groupID, name string\) \(domain.HostGroup, error\)](<#HostService.RenameGroup>)
   - [func \(s \*HostService\) UpdateHost\(ctx context.Context, input SaveHostInput\) \(domain.HostInstance, error\)](<#HostService.UpdateHost>)
+- [type ObservabilityService](<#ObservabilityService>)
+  - [func NewObservabilityService\(auth \*AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, services ports.ServiceRepository, vault \*VaultService, sshManager ports.SSHSessionManager, sink ServiceEventSink\) \*ObservabilityService](<#NewObservabilityService>)
+  - [func \(s \*ObservabilityService\) CloseAll\(\)](<#ObservabilityService.CloseAll>)
+  - [func \(s \*ObservabilityService\) CreateService\(ctx context.Context, input SaveServiceInput\) \(domain.PrivateService, error\)](<#ObservabilityService.CreateService>)
+  - [func \(s \*ObservabilityService\) DeleteService\(ctx context.Context, serviceID string\) error](<#ObservabilityService.DeleteService>)
+  - [func \(s \*ObservabilityService\) ListServices\(ctx context.Context\) \(\[\]domain.PrivateService, error\)](<#ObservabilityService.ListServices>)
+  - [func \(s \*ObservabilityService\) ListServicesByHost\(ctx context.Context, hostID string\) \(\[\]domain.PrivateService, error\)](<#ObservabilityService.ListServicesByHost>)
+  - [func \(s \*ObservabilityService\) ListStatuses\(\) \(\[\]domain.ServiceRuntimeStatus, error\)](<#ObservabilityService.ListStatuses>)
+  - [func \(s \*ObservabilityService\) ProbeServiceHealth\(ctx context.Context, serviceID string\) domain.ServiceRuntimeStatus](<#ObservabilityService.ProbeServiceHealth>)
+  - [func \(s \*ObservabilityService\) StartService\(ctx context.Context, serviceID string, passwordFallback string, tofuConfirm TOFUTrustPromptFunc\) \(domain.ServiceRuntimeStatus, error\)](<#ObservabilityService.StartService>)
+  - [func \(s \*ObservabilityService\) StopService\(serviceID string\) error](<#ObservabilityService.StopService>)
+  - [func \(s \*ObservabilityService\) UpdateService\(ctx context.Context, input SaveServiceInput\) \(domain.PrivateService, error\)](<#ObservabilityService.UpdateService>)
 - [type SaveHostInput](<#SaveHostInput>)
+- [type SaveServiceInput](<#SaveServiceInput>)
 - [type SaveSnippetInput](<#SaveSnippetInput>)
 - [type SaveTunnelInput](<#SaveTunnelInput>)
+- [type ServiceEventSink](<#ServiceEventSink>)
 - [type SessionService](<#SessionService>)
   - [func NewSessionService\(auth \*AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, vault \*VaultService, sshManager ports.SSHSessionManager, sink TerminalEventSink\) \*SessionService](<#NewSessionService>)
   - [func \(s \*SessionService\) CloseAll\(\)](<#SessionService.CloseAll>)
@@ -286,6 +300,116 @@ func (s *HostService) UpdateHost(ctx context.Context, input SaveHostInput) (doma
 
 UpdateHost modifies an existing HostInstance owned by the currently authenticated user.
 
+<a name="ObservabilityService"></a>
+## type [ObservabilityService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L49-L60>)
+
+ObservabilityService manages saved private web services and their local loopback SSH tunnels.
+
+```go
+type ObservabilityService struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewObservabilityService"></a>
+### func [NewObservabilityService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L63-L71>)
+
+```go
+func NewObservabilityService(auth *AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, services ports.ServiceRepository, vault *VaultService, sshManager ports.SSHSessionManager, sink ServiceEventSink) *ObservabilityService
+```
+
+NewObservabilityService constructs an ObservabilityService.
+
+<a name="ObservabilityService.CloseAll"></a>
+### func \(\*ObservabilityService\) [CloseAll](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L421>)
+
+```go
+func (s *ObservabilityService) CloseAll()
+```
+
+CloseAll stops all active tunnels during application shutdown or user vault lock.
+
+<a name="ObservabilityService.CreateService"></a>
+### func \(\*ObservabilityService\) [CreateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L85>)
+
+```go
+func (s *ObservabilityService) CreateService(ctx context.Context, input SaveServiceInput) (domain.PrivateService, error)
+```
+
+CreateService validates and persists a new PrivateService scoped to the current user.
+
+<a name="ObservabilityService.DeleteService"></a>
+### func \(\*ObservabilityService\) [DeleteService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L177>)
+
+```go
+func (s *ObservabilityService) DeleteService(ctx context.Context, serviceID string) error
+```
+
+DeleteService removes a stopped private service definition.
+
+<a name="ObservabilityService.ListServices"></a>
+### func \(\*ObservabilityService\) [ListServices](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L112>)
+
+```go
+func (s *ObservabilityService) ListServices(ctx context.Context) ([]domain.PrivateService, error)
+```
+
+ListServices returns all saved services owned by the active user.
+
+<a name="ObservabilityService.ListServicesByHost"></a>
+### func \(\*ObservabilityService\) [ListServicesByHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L125>)
+
+```go
+func (s *ObservabilityService) ListServicesByHost(ctx context.Context, hostID string) ([]domain.PrivateService, error)
+```
+
+ListServicesByHost returns saved services for a specific host owned by the active user.
+
+<a name="ObservabilityService.ListStatuses"></a>
+### func \(\*ObservabilityService\) [ListStatuses](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L402>)
+
+```go
+func (s *ObservabilityService) ListStatuses() ([]domain.ServiceRuntimeStatus, error)
+```
+
+ListStatuses returns runtime status snapshots for all active services owned by current user.
+
+<a name="ObservabilityService.ProbeServiceHealth"></a>
+### func \(\*ObservabilityService\) [ProbeServiceHealth](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L319>)
+
+```go
+func (s *ObservabilityService) ProbeServiceHealth(ctx context.Context, serviceID string) domain.ServiceRuntimeStatus
+```
+
+ProbeServiceHealth sends an HTTP GET probe to the service's health path through the active tunnel.
+
+<a name="ObservabilityService.StartService"></a>
+### func \(\*ObservabilityService\) [StartService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L198-L203>)
+
+```go
+func (s *ObservabilityService) StartService(ctx context.Context, serviceID string, passwordFallback string, tofuConfirm TOFUTrustPromptFunc) (domain.ServiceRuntimeStatus, error)
+```
+
+StartService starts the local loopback SSH tunnel for the service, checks its health, and emits status.
+
+<a name="ObservabilityService.StopService"></a>
+### func \(\*ObservabilityService\) [StopService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L292>)
+
+```go
+func (s *ObservabilityService) StopService(serviceID string) error
+```
+
+StopService closes the local tunnel for the given service.
+
+<a name="ObservabilityService.UpdateService"></a>
+### func \(\*ObservabilityService\) [UpdateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L138>)
+
+```go
+func (s *ObservabilityService) UpdateService(ctx context.Context, input SaveServiceInput) (domain.PrivateService, error)
+```
+
+UpdateService modifies an existing private service definition.
+
 <a name="SaveHostInput"></a>
 ## type [SaveHostInput](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L16-L26>)
 
@@ -302,6 +426,28 @@ type SaveHostInput struct {
     SSHKeyID    string             `json:"sshKeyId"`
     Environment domain.Environment `json:"environment"`
     Notes       string             `json:"notes"`
+}
+```
+
+<a name="SaveServiceInput"></a>
+## type [SaveServiceInput](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L21-L34>)
+
+SaveServiceInput captures fields required to create or update a private web service.
+
+```go
+type SaveServiceInput struct {
+    ID         string                 `json:"id,omitempty"`
+    HostID     string                 `json:"hostId"`
+    Name       string                 `json:"name"`
+    Preset     domain.ServicePreset   `json:"preset"`
+    Protocol   domain.ServiceProtocol `json:"protocol"`
+    RemoteHost string                 `json:"remoteHost"`
+    RemotePort int                    `json:"remotePort"`
+    BasePath   string                 `json:"basePath"`
+    LocalPort  int                    `json:"localPort"`
+    HealthPath string                 `json:"healthPath"`
+    OpenMode   domain.ServiceOpenMode `json:"openMode"`
+    Notes      string                 `json:"notes"`
 }
 ```
 
@@ -338,6 +484,17 @@ type SaveTunnelInput struct {
     RemoteHost string              `json:"remoteHost"`
     RemotePort int                 `json:"remotePort"`
     Notes      string              `json:"notes"`
+}
+```
+
+<a name="ServiceEventSink"></a>
+## type [ServiceEventSink](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L37-L39>)
+
+ServiceEventSink notifies the UI about runtime changes to a service's tunnel and health status.
+
+```go
+type ServiceEventSink interface {
+    OnServiceStatusChanged(status domain.ServiceRuntimeStatus)
 }
 ```
 
