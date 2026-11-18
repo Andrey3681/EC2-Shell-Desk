@@ -51,6 +51,7 @@ func Run(assets fs.FS) error {
 	groupRepo := sqlite.NewGroupRepository(store)
 	tunnelRepo := sqlite.NewTunnelRepository(store)
 	snippetRepo := sqlite.NewSnippetRepository(store)
+	serviceRepo := sqlite.NewServiceRepository(store)
 
 	sshManager := sshclient.NewManager(sftpclient.NewFromSSHClient)
 	localFS := winfs.NewWinFS()
@@ -63,14 +64,16 @@ func Run(assets fs.FS) error {
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, localFS, bridge)
 	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshManager, bridge)
 	snippetSvc := services.NewSnippetService(authSvc, snippetRepo, hostRepo, groupRepo, sessionSvc)
+	obsSvc := services.NewObservabilityService(authSvc, hostRepo, knownRepo, serviceRepo, vaultSvc, sshManager, bridge)
 
-	authHandler := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc)
+	authHandler := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc, obsSvc)
 	keyHandler := app.NewKeyHandler(bridge, vaultSvc)
 	hostHandler := app.NewHostHandler(bridge, hostSvc)
 	termHandler := app.NewTerminalHandler(bridge, sessionSvc)
 	sftpHandler := app.NewSFTPHandler(bridge, transferSvc)
 	tunnelHandler := app.NewTunnelHandler(bridge, tunnelSvc)
 	snippetHandler := app.NewSnippetHandler(bridge, snippetSvc)
+	obsHandler := app.NewObservabilityHandler(bridge, obsSvc)
 
 	runErr := wails.Run(&options.App{
 		Title:     "EC2 Shell Desk",
@@ -99,6 +102,7 @@ func Run(assets fs.FS) error {
 		OnShutdown: func(_ context.Context) {
 			transferSvc.CloseAll()
 			tunnelSvc.CloseAll()
+			obsSvc.CloseAll()
 			sessionSvc.CloseAll()
 			authSvc.Lock()
 			if closeErr := store.Close(); closeErr != nil {
@@ -114,6 +118,7 @@ func Run(assets fs.FS) error {
 			sftpHandler,
 			tunnelHandler,
 			snippetHandler,
+			obsHandler,
 		},
 	})
 	if runErr != nil {

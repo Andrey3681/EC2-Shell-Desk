@@ -17,11 +17,12 @@ type AuthStatus struct {
 
 // AuthHandler exposes local authentication and multi-user session lifecycle bindings to Wails.
 type AuthHandler struct {
-	bridge    *EventBridge
-	auth      *services.AuthService
-	sessions  *services.SessionService
-	transfers *services.TransferService
-	tunnels   *services.TunnelService
+	bridge        *EventBridge
+	auth          *services.AuthService
+	sessions      *services.SessionService
+	transfers     *services.TransferService
+	tunnels       *services.TunnelService
+	observability *services.ObservabilityService
 }
 
 // NewAuthHandler constructs an AuthHandler wired to authentication and active session lifecycles.
@@ -31,13 +32,15 @@ func NewAuthHandler(
 	sessions *services.SessionService,
 	transfers *services.TransferService,
 	tunnels *services.TunnelService,
+	observability *services.ObservabilityService,
 ) *AuthHandler {
 	return &AuthHandler{
-		bridge:    bridge,
-		auth:      auth,
-		sessions:  sessions,
-		transfers: transfers,
-		tunnels:   tunnels,
+		bridge:        bridge,
+		auth:          auth,
+		sessions:      sessions,
+		transfers:     transfers,
+		tunnels:       tunnels,
+		observability: observability,
 	}
 }
 
@@ -85,6 +88,9 @@ func (h *AuthHandler) Login(username, password string) (domain.UserProfile, erro
 	if h.tunnels != nil {
 		h.tunnels.CloseAll()
 	}
+	if h.observability != nil {
+		h.observability.CloseAll()
+	}
 	if h.sessions != nil {
 		h.sessions.CloseAll()
 	}
@@ -98,6 +104,9 @@ func (h *AuthHandler) Lock() {
 	}
 	if h.tunnels != nil {
 		h.tunnels.CloseAll()
+	}
+	if h.observability != nil {
+		h.observability.CloseAll()
 	}
 	if h.sessions != nil {
 		h.sessions.CloseAll()

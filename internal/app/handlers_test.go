@@ -61,6 +61,7 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	groupRepo := sqlite.NewGroupRepository(store)
 	tunnelRepo := sqlite.NewTunnelRepository(store)
 	snippetRepo := sqlite.NewSnippetRepository(store)
+	serviceRepo := sqlite.NewServiceRepository(store)
 
 	bridge := app.NewEventBridge()
 	sshMgr := sshclient.NewManager(sftpclient.NewFromSSHClient)
@@ -71,13 +72,15 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, winfs.NewWinFS(), bridge)
 	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshMgr, bridge)
 	snippetSvc := services.NewSnippetService(authSvc, snippetRepo, hostRepo, groupRepo, sessionSvc)
+	obsSvc := services.NewObservabilityService(authSvc, hostRepo, knownRepo, serviceRepo, vaultSvc, sshMgr, bridge)
 
-	authH := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc)
+	authH := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc, obsSvc)
 	keyH := app.NewKeyHandler(bridge, vaultSvc)
 	hostH := app.NewHostHandler(bridge, hostSvc)
 	sftpH := app.NewSFTPHandler(bridge, transferSvc)
 	tunnelH := app.NewTunnelHandler(bridge, tunnelSvc)
 	snippetH := app.NewSnippetHandler(bridge, snippetSvc)
+	obsH := app.NewObservabilityHandler(bridge, obsSvc)
 
 	status, err := authH.Status()
 	if err != nil || status.HasUsers || status.Unlocked {
@@ -156,6 +159,29 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	snips, err := snippetH.ListSnippets()
 	if err != nil || len(snips) != 1 {
 		t.Fatalf("ListSnippets() = (%+v, %v)", snips, err)
+	}
+
+	createdSvc, err := obsH.CreateService(services.SaveServiceInput{
+		HostID:     host.ID,
+		Name:       "Grafana Metrics",
+		Preset:     domain.ServicePresetGrafana,
+		Protocol:   domain.ServiceProtocolHTTP,
+		RemoteHost: "127.0.0.1",
+		RemotePort: 3001,
+		BasePath:   "/grafana",
+		HealthPath: "/api/health",
+		OpenMode:   domain.ServiceOpenModeBrowser,
+	})
+	if err != nil || createdSvc.Name != "Grafana Metrics" {
+		t.Fatalf("CreateService() = (%+v, %v)", createdSvc, err)
+	}
+	svcs, err := obsH.ListServices()
+	if err != nil || len(svcs) != 1 {
+		t.Fatalf("ListServices() = (%+v, %v)", svcs, err)
+	}
+	byHostSvcs, err := obsH.ListServicesByHost(host.ID)
+	if err != nil || len(byHostSvcs) != 1 {
+		t.Fatalf("ListServicesByHost() = (%+v, %v)", byHostSvcs, err)
 	}
 
 	roots, err := sftpH.ListLocalRoots()

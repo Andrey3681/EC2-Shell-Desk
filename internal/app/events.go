@@ -112,6 +112,17 @@ func (b *EventBridge) OnTunnelStatusChanged(status domain.TunnelRuntimeStatus) {
 	runtime.EventsEmit(ctx, "tunnel:status", status)
 }
 
+// OnServiceStatusChanged emits private service status changes and health results to the desktop UI.
+func (b *EventBridge) OnServiceStatusChanged(status domain.ServiceRuntimeStatus) {
+	b.mu.RLock()
+	ctx := b.ctx
+	b.mu.RUnlock()
+	if ctx == nil {
+		return
+	}
+	runtime.EventsEmit(ctx, "service:status", status)
+}
+
 // RequestTOFUTrust emits a host key fingerprint prompt to the UI and waits for the user's decision.
 func (b *EventBridge) RequestTOFUTrust(ctx context.Context, challenge ports.HostKeyChallenge) (bool, error) {
 	b.mu.RLock()
