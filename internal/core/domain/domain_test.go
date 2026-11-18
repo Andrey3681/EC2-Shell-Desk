@@ -186,3 +186,36 @@ func TestValidateGroupName(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandSnippetValidate(t *testing.T) {
+	valid := domain.CommandSnippet{
+		ID:          "snip-1",
+		OwnerUserID: "user-1",
+		Name:        "Deploy API",
+		Command:     "git pull && docker compose up -d --build",
+		AutoExecute: true,
+	}
+
+	tests := []struct {
+		name    string
+		mutate  func(s *domain.CommandSnippet)
+		wantErr error
+	}{
+		{name: "valid snippet", mutate: func(_ *domain.CommandSnippet) {}, wantErr: nil},
+		{name: "missing owner", mutate: func(s *domain.CommandSnippet) { s.OwnerUserID = "" }, wantErr: domain.ErrInvalidInput},
+		{name: "empty name", mutate: func(s *domain.CommandSnippet) { s.Name = "   " }, wantErr: domain.ErrInvalidInput},
+		{name: "empty command", mutate: func(s *domain.CommandSnippet) { s.Command = "  \n " }, wantErr: domain.ErrInvalidInput},
+		{name: "command too large", mutate: func(s *domain.CommandSnippet) { s.Command = string(make([]byte, domain.MaxSnippetCommandLength+1)) }, wantErr: domain.ErrInvalidInput},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := valid
+			tc.mutate(&s)
+			err := s.Validate()
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("Validate() error = %v, want %v", err, tc.wantErr)
+			}
+		})
+	}
+}

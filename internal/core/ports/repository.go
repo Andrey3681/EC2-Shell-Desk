@@ -61,3 +61,12 @@ type HostGroupRepository interface {
 	Update(ctx context.Context, group domain.HostGroup) error
 	Delete(ctx context.Context, ownerUserID, groupID string) error
 }
+
+// SnippetRepository persists reusable command snippets scoped strictly by owner user ID.
+type SnippetRepository interface {
+	Create(ctx context.Context, snippet domain.CommandSnippet) error
+	GetByID(ctx context.Context, ownerUserID, snippetID string) (domain.CommandSnippet, error)
+	ListByUser(ctx context.Context, ownerUserID string) ([]domain.CommandSnippet, error)
+	Update(ctx context.Context, snippet domain.CommandSnippet) error
+	Delete(ctx context.Context, ownerUserID, snippetID string) error
+}
