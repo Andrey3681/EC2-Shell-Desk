@@ -21,11 +21,15 @@ Package services implements application use cases orchestrating authentication, 
   - [func \(s \*AuthService\) Lock\(\)](<#AuthService.Lock>)
   - [func \(s \*AuthService\) Login\(ctx context.Context, username, password string\) \(domain.UserProfile, error\)](<#AuthService.Login>)
 - [type HostService](<#HostService>)
-  - [func NewHostService\(auth \*AuthService, hosts ports.HostRepository, keys ports.KeyRepository, tunnels ports.TunnelRepository\) \*HostService](<#NewHostService>)
+  - [func NewHostService\(auth \*AuthService, hosts ports.HostRepository, keys ports.KeyRepository, groups ports.HostGroupRepository, tunnels ports.TunnelRepository\) \*HostService](<#NewHostService>)
+  - [func \(s \*HostService\) CreateGroup\(ctx context.Context, name string\) \(domain.HostGroup, error\)](<#HostService.CreateGroup>)
   - [func \(s \*HostService\) CreateHost\(ctx context.Context, input SaveHostInput\) \(domain.HostInstance, error\)](<#HostService.CreateHost>)
+  - [func \(s \*HostService\) DeleteGroup\(ctx context.Context, groupID string\) error](<#HostService.DeleteGroup>)
   - [func \(s \*HostService\) DeleteHost\(ctx context.Context, hostID string\) error](<#HostService.DeleteHost>)
   - [func \(s \*HostService\) GetHost\(ctx context.Context, hostID string\) \(domain.HostInstance, error\)](<#HostService.GetHost>)
+  - [func \(s \*HostService\) ListGroups\(ctx context.Context\) \(\[\]domain.HostGroup, error\)](<#HostService.ListGroups>)
   - [func \(s \*HostService\) ListHosts\(ctx context.Context\) \(\[\]domain.HostInstance, error\)](<#HostService.ListHosts>)
+  - [func \(s \*HostService\) RenameGroup\(ctx context.Context, groupID, name string\) \(domain.HostGroup, error\)](<#HostService.RenameGroup>)
   - [func \(s \*HostService\) UpdateHost\(ctx context.Context, input SaveHostInput\) \(domain.HostInstance, error\)](<#HostService.UpdateHost>)
 - [type SaveHostInput](<#SaveHostInput>)
 - [type SaveTunnelInput](<#SaveTunnelInput>)
@@ -173,9 +177,9 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (dom
 Login authenticates a local user, derives their vault master key, and sets the active session.
 
 <a name="HostService"></a>
-## type [HostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L28-L33>)
+## type [HostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L29-L35>)
 
-HostService manages EC2 and Linux host instances isolated strictly per authenticated user.
+HostService manages EC2 and Linux host instances and user\-defined groups isolated per authenticated user.
 
 ```go
 type HostService struct {
@@ -184,16 +188,25 @@ type HostService struct {
 ```
 
 <a name="NewHostService"></a>
-### func [NewHostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L36-L41>)
+### func [NewHostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L38-L44>)
 
 ```go
-func NewHostService(auth *AuthService, hosts ports.HostRepository, keys ports.KeyRepository, tunnels ports.TunnelRepository) *HostService
+func NewHostService(auth *AuthService, hosts ports.HostRepository, keys ports.KeyRepository, groups ports.HostGroupRepository, tunnels ports.TunnelRepository) *HostService
 ```
 
-NewHostService constructs a HostService with active session, host, key, and optional tunnel repositories.
+NewHostService constructs a HostService with active session, host, key, group, and optional tunnel repositories.
+
+<a name="HostService.CreateGroup"></a>
+### func \(\*HostService\) [CreateGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L199>)
+
+```go
+func (s *HostService) CreateGroup(ctx context.Context, name string) (domain.HostGroup, error)
+```
+
+CreateGroup validates and creates a new host group owned by the active user.
 
 <a name="HostService.CreateHost"></a>
-### func \(\*HostService\) [CreateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L51>)
+### func \(\*HostService\) [CreateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L55>)
 
 ```go
 func (s *HostService) CreateHost(ctx context.Context, input SaveHostInput) (domain.HostInstance, error)
@@ -201,8 +214,17 @@ func (s *HostService) CreateHost(ctx context.Context, input SaveHostInput) (doma
 
 CreateHost validates and persists a new HostInstance owned by the currently authenticated user.
 
+<a name="HostService.DeleteGroup"></a>
+### func \(\*HostService\) [DeleteGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L256>)
+
+```go
+func (s *HostService) DeleteGroup(ctx context.Context, groupID string) error
+```
+
+DeleteGroup removes a host group owned by the active user; member instances become ungrouped.
+
 <a name="HostService.DeleteHost"></a>
-### func \(\*HostService\) [DeleteHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L146>)
+### func \(\*HostService\) [DeleteHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L156>)
 
 ```go
 func (s *HostService) DeleteHost(ctx context.Context, hostID string) error
@@ -211,7 +233,7 @@ func (s *HostService) DeleteHost(ctx context.Context, hostID string) error
 DeleteHost deletes a HostInstance owned by the currently authenticated user unless tunnels reference it.
 
 <a name="HostService.GetHost"></a>
-### func \(\*HostService\) [GetHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L92>)
+### func \(\*HostService\) [GetHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L99>)
 
 ```go
 func (s *HostService) GetHost(ctx context.Context, hostID string) (domain.HostInstance, error)
@@ -219,8 +241,17 @@ func (s *HostService) GetHost(ctx context.Context, hostID string) (domain.HostIn
 
 GetHost retrieves a single HostInstance belonging to the currently authenticated user.
 
+<a name="HostService.ListGroups"></a>
+### func \(\*HostService\) [ListGroups](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L183>)
+
+```go
+func (s *HostService) ListGroups(ctx context.Context) ([]domain.HostGroup, error)
+```
+
+ListGroups returns all user\-defined host groups belonging to the active user.
+
 <a name="HostService.ListHosts"></a>
-### func \(\*HostService\) [ListHosts](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L78>)
+### func \(\*HostService\) [ListHosts](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L85>)
 
 ```go
 func (s *HostService) ListHosts(ctx context.Context) ([]domain.HostInstance, error)
@@ -228,8 +259,17 @@ func (s *HostService) ListHosts(ctx context.Context) ([]domain.HostInstance, err
 
 ListHosts returns all HostInstance records belonging to the currently authenticated user.
 
+<a name="HostService.RenameGroup"></a>
+### func \(\*HostService\) [RenameGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L227>)
+
+```go
+func (s *HostService) RenameGroup(ctx context.Context, groupID, name string) (domain.HostGroup, error)
+```
+
+RenameGroup updates the name of an existing host group owned by the active user.
+
 <a name="HostService.UpdateHost"></a>
-### func \(\*HostService\) [UpdateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L110>)
+### func \(\*HostService\) [UpdateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L117>)
 
 ```go
 func (s *HostService) UpdateHost(ctx context.Context, input SaveHostInput) (domain.HostInstance, error)
@@ -238,13 +278,14 @@ func (s *HostService) UpdateHost(ctx context.Context, input SaveHostInput) (doma
 UpdateHost modifies an existing HostInstance owned by the currently authenticated user.
 
 <a name="SaveHostInput"></a>
-## type [SaveHostInput](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L16-L25>)
+## type [SaveHostInput](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L16-L26>)
 
 SaveHostInput captures fields required to create or update an EC2/Linux HostInstance.
 
 ```go
 type SaveHostInput struct {
     ID          string             `json:"id,omitempty"`
+    GroupID     string             `json:"groupId"`
     Alias       string             `json:"alias"`
     HostAddress string             `json:"hostAddress"`
     Port        int                `json:"port"`

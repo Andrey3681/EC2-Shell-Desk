@@ -10,6 +10,13 @@ Package sqlite implements repository ports using pure\-Go SQLite persistence wit
 
 ## Index
 
+- [type GroupRepository](<#GroupRepository>)
+  - [func NewGroupRepository\(store \*Store\) \*GroupRepository](<#NewGroupRepository>)
+  - [func \(r \*GroupRepository\) Create\(ctx context.Context, group domain.HostGroup\) error](<#GroupRepository.Create>)
+  - [func \(r \*GroupRepository\) Delete\(ctx context.Context, ownerUserID, groupID string\) error](<#GroupRepository.Delete>)
+  - [func \(r \*GroupRepository\) GetByID\(ctx context.Context, ownerUserID, groupID string\) \(domain.HostGroup, error\)](<#GroupRepository.GetByID>)
+  - [func \(r \*GroupRepository\) ListByUser\(ctx context.Context, ownerUserID string\) \(\[\]domain.HostGroup, error\)](<#GroupRepository.ListByUser>)
+  - [func \(r \*GroupRepository\) Update\(ctx context.Context, group domain.HostGroup\) error](<#GroupRepository.Update>)
 - [type HostRepository](<#HostRepository>)
   - [func NewHostRepository\(store \*Store\) \*HostRepository](<#NewHostRepository>)
   - [func \(r \*HostRepository\) Create\(ctx context.Context, host domain.HostInstance\) error](<#HostRepository.Create>)
@@ -51,6 +58,71 @@ Package sqlite implements repository ports using pure\-Go SQLite persistence wit
   - [func \(r \*UserRepository\) List\(ctx context.Context\) \(\[\]domain.User, error\)](<#UserRepository.List>)
 
 
+<a name="GroupRepository"></a>
+## type [GroupRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/group_repo.go#L13-L15>)
+
+GroupRepository implements ports.HostGroupRepository backed by SQLite with strict owner\_user\_id isolation.
+
+```go
+type GroupRepository struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewGroupRepository"></a>
+### func [NewGroupRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/group_repo.go#L18>)
+
+```go
+func NewGroupRepository(store *Store) *GroupRepository
+```
+
+NewGroupRepository creates a GroupRepository using the provided SQLite Store.
+
+<a name="GroupRepository.Create"></a>
+### func \(\*GroupRepository\) [Create](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/group_repo.go#L23>)
+
+```go
+func (r *GroupRepository) Create(ctx context.Context, group domain.HostGroup) error
+```
+
+Create inserts a new HostGroup owned by group.OwnerUserID.
+
+<a name="GroupRepository.Delete"></a>
+### func \(\*GroupRepository\) [Delete](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/group_repo.go#L125>)
+
+```go
+func (r *GroupRepository) Delete(ctx context.Context, ownerUserID, groupID string) error
+```
+
+Delete removes a HostGroup owned by ownerUserID; member hosts become ungrouped automatically.
+
+<a name="GroupRepository.GetByID"></a>
+### func \(\*GroupRepository\) [GetByID](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/group_repo.go#L47>)
+
+```go
+func (r *GroupRepository) GetByID(ctx context.Context, ownerUserID, groupID string) (domain.HostGroup, error)
+```
+
+GetByID retrieves a HostGroup only if it belongs to ownerUserID.
+
+<a name="GroupRepository.ListByUser"></a>
+### func \(\*GroupRepository\) [ListByUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/group_repo.go#L64>)
+
+```go
+func (r *GroupRepository) ListByUser(ctx context.Context, ownerUserID string) ([]domain.HostGroup, error)
+```
+
+ListByUser returns all HostGroup records belonging strictly to ownerUserID.
+
+<a name="GroupRepository.Update"></a>
+### func \(\*GroupRepository\) [Update](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/group_repo.go#L94>)
+
+```go
+func (r *GroupRepository) Update(ctx context.Context, group domain.HostGroup) error
+```
+
+Update modifies an existing HostGroup only if owned by group.OwnerUserID.
+
 <a name="HostRepository"></a>
 ## type [HostRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L14-L16>)
 
@@ -81,7 +153,7 @@ func (r *HostRepository) Create(ctx context.Context, host domain.HostInstance) e
 Create inserts a new HostInstance owned by host.OwnerUserID.
 
 <a name="HostRepository.Delete"></a>
-### func \(\*HostRepository\) [Delete](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L153>)
+### func \(\*HostRepository\) [Delete](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L165>)
 
 ```go
 func (r *HostRepository) Delete(ctx context.Context, ownerUserID, hostID string) error
@@ -90,7 +162,7 @@ func (r *HostRepository) Delete(ctx context.Context, ownerUserID, hostID string)
 Delete removes a HostInstance only if owned by ownerUserID.
 
 <a name="HostRepository.GetByID"></a>
-### func \(\*HostRepository\) [GetByID](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L64>)
+### func \(\*HostRepository\) [GetByID](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L70>)
 
 ```go
 func (r *HostRepository) GetByID(ctx context.Context, ownerUserID, hostID string) (domain.HostInstance, error)
@@ -99,7 +171,7 @@ func (r *HostRepository) GetByID(ctx context.Context, ownerUserID, hostID string
 GetByID retrieves a HostInstance only if it belongs to ownerUserID.
 
 <a name="HostRepository.ListByUser"></a>
-### func \(\*HostRepository\) [ListByUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L82>)
+### func \(\*HostRepository\) [ListByUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L88>)
 
 ```go
 func (r *HostRepository) ListByUser(ctx context.Context, ownerUserID string) ([]domain.HostInstance, error)
@@ -108,7 +180,7 @@ func (r *HostRepository) ListByUser(ctx context.Context, ownerUserID string) ([]
 ListByUser returns all HostInstance records belonging strictly to ownerUserID.
 
 <a name="HostRepository.TouchLastConnected"></a>
-### func \(\*HostRepository\) [TouchLastConnected](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L170>)
+### func \(\*HostRepository\) [TouchLastConnected](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L182>)
 
 ```go
 func (r *HostRepository) TouchLastConnected(ctx context.Context, ownerUserID, hostID string, connectedAt time.Time) error
@@ -117,7 +189,7 @@ func (r *HostRepository) TouchLastConnected(ctx context.Context, ownerUserID, ho
 TouchLastConnected updates the last\_connected\_at timestamp for a user\-owned host.
 
 <a name="HostRepository.Update"></a>
-### func \(\*HostRepository\) [Update](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L113>)
+### func \(\*HostRepository\) [Update](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/host_repo.go#L119>)
 
 ```go
 func (r *HostRepository) Update(ctx context.Context, host domain.HostInstance) error

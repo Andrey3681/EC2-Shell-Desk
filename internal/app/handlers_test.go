@@ -58,13 +58,14 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	keyRepo := sqlite.NewKeyRepository(store)
 	hostRepo := sqlite.NewHostRepository(store)
 	knownRepo := sqlite.NewKnownHostRepository(store)
+	groupRepo := sqlite.NewGroupRepository(store)
 	tunnelRepo := sqlite.NewTunnelRepository(store)
 
 	bridge := app.NewEventBridge()
 	sshMgr := sshclient.NewManager(sftpclient.NewFromSSHClient)
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, tunnelRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, tunnelRepo)
 	sessionSvc := services.NewSessionService(authSvc, hostRepo, knownRepo, vaultSvc, sshMgr, bridge)
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, winfs.NewWinFS(), bridge)
 	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshMgr, bridge)
@@ -100,7 +101,13 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 		t.Fatalf("ImportKeyFromFile() error = %v", err)
 	}
 
+	group, err := hostH.CreateGroup("Trabajo")
+	if err != nil || group.Name != "Trabajo" {
+		t.Fatalf("CreateGroup() = (%+v, %v)", group, err)
+	}
+
 	host, err := hostH.CreateHost(services.SaveHostInput{
+		GroupID:     group.ID,
 		Alias:       "Web Prod",
 		HostAddress: "54.1.2.3",
 		SSHUsername: "ec2-user",
@@ -112,7 +119,7 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	}
 
 	hosts, err := hostH.ListHosts()
-	if err != nil || len(hosts) != 1 || hosts[0].ID != host.ID {
+	if err != nil || len(hosts) != 1 || hosts[0].ID != host.ID || hosts[0].GroupID != group.ID {
 		t.Fatalf("ListHosts() = (%+v, %v)", hosts, err)
 	}
 

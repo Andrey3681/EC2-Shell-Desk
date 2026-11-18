@@ -24,9 +24,14 @@ func NewHostRepository(store *Store) *HostRepository {
 func (r *HostRepository) Create(ctx context.Context, host domain.HostInstance) error {
 	const query = `
 		INSERT INTO host_instances (
-			id, owner_user_id, alias, host_address, port, ssh_username, ssh_key_id,
+			id, owner_user_id, group_id, alias, host_address, port, ssh_username, ssh_key_id,
 			environment, notes, last_connected_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+	var groupID sql.NullString
+	if host.GroupID != "" {
+		groupID = sql.NullString{String: host.GroupID, Valid: true}
+	}
 
 	var keyID sql.NullString
 	if host.SSHKeyID != "" {
@@ -43,6 +48,7 @@ func (r *HostRepository) Create(ctx context.Context, host domain.HostInstance) e
 		query,
 		host.ID,
 		host.OwnerUserID,
+		groupID,
 		host.Alias,
 		host.HostAddress,
 		host.Port,
@@ -63,7 +69,7 @@ func (r *HostRepository) Create(ctx context.Context, host domain.HostInstance) e
 // GetByID retrieves a HostInstance only if it belongs to ownerUserID.
 func (r *HostRepository) GetByID(ctx context.Context, ownerUserID, hostID string) (domain.HostInstance, error) {
 	const query = `
-		SELECT id, owner_user_id, alias, host_address, port, ssh_username, ssh_key_id,
+		SELECT id, owner_user_id, group_id, alias, host_address, port, ssh_username, ssh_key_id,
 		       environment, notes, last_connected_at, created_at, updated_at
 		FROM host_instances
 		WHERE id = ? AND owner_user_id = ?`
@@ -81,7 +87,7 @@ func (r *HostRepository) GetByID(ctx context.Context, ownerUserID, hostID string
 // ListByUser returns all HostInstance records belonging strictly to ownerUserID.
 func (r *HostRepository) ListByUser(ctx context.Context, ownerUserID string) ([]domain.HostInstance, error) {
 	const query = `
-		SELECT id, owner_user_id, alias, host_address, port, ssh_username, ssh_key_id,
+		SELECT id, owner_user_id, group_id, alias, host_address, port, ssh_username, ssh_key_id,
 		       environment, notes, last_connected_at, created_at, updated_at
 		FROM host_instances
 		WHERE owner_user_id = ?
@@ -113,9 +119,14 @@ func (r *HostRepository) ListByUser(ctx context.Context, ownerUserID string) ([]
 func (r *HostRepository) Update(ctx context.Context, host domain.HostInstance) error {
 	const query = `
 		UPDATE host_instances
-		SET alias = ?, host_address = ?, port = ?, ssh_username = ?, ssh_key_id = ?,
+		SET group_id = ?, alias = ?, host_address = ?, port = ?, ssh_username = ?, ssh_key_id = ?,
 		    environment = ?, notes = ?, updated_at = ?
 		WHERE id = ? AND owner_user_id = ?`
+
+	var groupID sql.NullString
+	if host.GroupID != "" {
+		groupID = sql.NullString{String: host.GroupID, Valid: true}
+	}
 
 	var keyID sql.NullString
 	if host.SSHKeyID != "" {
@@ -125,6 +136,7 @@ func (r *HostRepository) Update(ctx context.Context, host domain.HostInstance) e
 	res, err := r.db.ExecContext(
 		ctx,
 		query,
+		groupID,
 		host.Alias,
 		host.HostAddress,
 		host.Port,
@@ -186,6 +198,7 @@ func (r *HostRepository) TouchLastConnected(ctx context.Context, ownerUserID, ho
 func scanHostRow(scanner rowScanner) (domain.HostInstance, error) {
 	var (
 		h             domain.HostInstance
+		groupID       sql.NullString
 		sshKeyID      sql.NullString
 		environment   string
 		lastConnected sql.NullString
@@ -195,6 +208,7 @@ func scanHostRow(scanner rowScanner) (domain.HostInstance, error) {
 	if err := scanner.Scan(
 		&h.ID,
 		&h.OwnerUserID,
+		&groupID,
 		&h.Alias,
 		&h.HostAddress,
 		&h.Port,
@@ -207,6 +221,9 @@ func scanHostRow(scanner rowScanner) (domain.HostInstance, error) {
 		&updatedAt,
 	); err != nil {
 		return domain.HostInstance{}, fmt.Errorf("scan host instance row: %w", err)
+	}
+	if groupID.Valid {
+		h.GroupID = groupID.String
 	}
 	if sshKeyID.Valid {
 		h.SSHKeyID = sshKeyID.String

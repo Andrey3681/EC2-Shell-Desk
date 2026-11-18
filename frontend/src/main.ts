@@ -1,6 +1,7 @@
 import "./styles/app.css";
 import { renderAuthView } from "./components/AuthView";
 import { escapeHtml, extractErrorMessage } from "./components/dom";
+import { openGroupModal } from "./components/GroupModal";
 import { openHostModal } from "./components/HostModal";
 import { renderInstanceSidebar } from "./components/InstanceSidebar";
 import { openKeyVaultModal } from "./components/KeyVaultModal";
@@ -12,6 +13,7 @@ import { XftpDualPane } from "./components/XftpDualPane";
 import { getLocale, setLocale, t, type Locale } from "./i18n";
 import {
   desktopApi,
+  type HostGroup,
   type HostInstance,
   type SSHKeySummary,
   type SSHTunnel,
@@ -24,11 +26,13 @@ const rootEl = document.getElementById("app") as HTMLElement;
 let activeUser: UserProfile | null = null;
 let sidebarTab: "hosts" | "tunnels" = "hosts";
 let hosts: HostInstance[] = [];
+let groups: HostGroup[] = [];
 let keys: SSHKeySummary[] = [];
 let tunnels: SSHTunnel[] = [];
 const tunnelStatuses = new Map<string, TunnelRuntimeStatus>();
 let searchFilter = "";
 let envFilter = "ALL";
+const collapsedGroups = new Set<string>();
 let terminalMgr: TerminalTabsManager | null = null;
 let xftpPane: XftpDualPane | null = null;
 
@@ -69,6 +73,7 @@ function mountAuth(hasUsers: boolean): void {
   xftpPane = null;
   activeUser = null;
   tunnelStatuses.clear();
+  collapsedGroups.clear();
 
   renderAuthView(rootEl, {
     hasUsers,
@@ -84,14 +89,16 @@ function mountAuth(hasUsers: boolean): void {
 
 async function refreshInventory(): Promise<void> {
   try {
-    const [loadedHosts, loadedKeys, loadedTunnels, loadedStatuses] =
+    const [loadedHosts, loadedGroups, loadedKeys, loadedTunnels, loadedStatuses] =
       await Promise.all([
         desktopApi.hosts.list(),
+        desktopApi.groups.list(),
         desktopApi.keys.list(),
         desktopApi.tunnels.list(),
         desktopApi.tunnels.listStatuses(),
       ]);
     hosts = loadedHosts ?? [];
+    groups = loadedGroups ?? [];
     keys = loadedKeys ?? [];
     tunnels = loadedTunnels ?? [];
     tunnelStatuses.clear();
@@ -100,6 +107,7 @@ async function refreshInventory(): Promise<void> {
     }
   } catch (err) {
     hosts = hosts ?? [];
+    groups = groups ?? [];
     keys = keys ?? [];
     tunnels = tunnels ?? [];
     window.alert(extractErrorMessage(err));
@@ -183,9 +191,13 @@ function drawSidebarContent(bodyEl: HTMLElement): void {
     return;
   }
 
+  const prevSearch = bodyEl.querySelector<HTMLInputElement>("#host-search");
+  const hadFocus = document.activeElement === prevSearch;
+  const cursorPos = prevSearch?.selectionStart ?? null;
+
   renderInstanceSidebar(
     bodyEl,
-    { hosts, keys, search: searchFilter, envFilter },
+    { hosts, groups, keys, search: searchFilter, envFilter, collapsedGroups },
     {
       onSearchChange: (q) => {
         searchFilter = q;
@@ -195,16 +207,49 @@ function drawSidebarContent(bodyEl: HTMLElement): void {
         envFilter = env;
         drawSidebarContent(bodyEl);
       },
-      onNewHost: () => {
-        openHostModal(null, keys, () => {
+      onToggleGroup: (groupKey) => {
+        if (collapsedGroups.has(groupKey)) {
+          collapsedGroups.delete(groupKey);
+        } else {
+          collapsedGroups.add(groupKey);
+        }
+        drawSidebarContent(bodyEl);
+      },
+      onNewGroup: () => {
+        openGroupModal(null, () => {
           void refreshInventory();
         });
+      },
+      onRenameGroup: (group) => {
+        openGroupModal(group, () => {
+          void refreshInventory();
+        });
+      },
+      onDeleteGroup: async (group) => {
+        if (!window.confirm(t().sidebar.deleteGroupConfirm)) return;
+        try {
+          await desktopApi.groups.delete(group.id);
+          await refreshInventory();
+        } catch (err) {
+          window.alert(extractErrorMessage(err));
+        }
+      },
+      onNewHost: (defaultGroupId = "") => {
+        openHostModal(
+          null,
+          keys,
+          groups,
+          () => {
+            void refreshInventory();
+          },
+          defaultGroupId
+        );
       },
       onConnectHost: (host) => {
         void connectHost(host);
       },
       onEditHost: (host) => {
-        openHostModal(host, keys, () => {
+        openHostModal(host, keys, groups, () => {
           void refreshInventory();
         });
       },
@@ -219,6 +264,16 @@ function drawSidebarContent(bodyEl: HTMLElement): void {
       },
     }
   );
+
+  if (hadFocus) {
+    const nextSearch = bodyEl.querySelector<HTMLInputElement>("#host-search");
+    if (nextSearch) {
+      nextSearch.focus();
+      if (cursorPos !== null) {
+        nextSearch.setSelectionRange(cursorPos, cursorPos);
+      }
+    }
+  }
 }
 
 async function startTunnel(tun: SSHTunnel): Promise<void> {

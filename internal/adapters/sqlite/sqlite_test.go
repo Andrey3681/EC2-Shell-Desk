@@ -236,4 +236,47 @@ func TestMultiUserIsolationAndCRUD(t *testing.T) {
 	if err := tunnelRepo.Delete(ctx, alice.ID, tun.ID); err != nil {
 		t.Fatalf("Alice Delete(tunnel) error = %v", err)
 	}
+
+	// Host Groups CRUD, multi-user isolation, and ON DELETE SET NULL on host_instances.
+	groupRepo := sqlite.NewGroupRepository(store)
+	uniGroup := domain.HostGroup{
+		ID:          "grp-uni",
+		OwnerUserID: alice.ID,
+		Name:        "Universidad",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := groupRepo.Create(ctx, uniGroup); err != nil {
+		t.Fatalf("Create(uniGroup) error = %v", err)
+	}
+	if err := groupRepo.Create(ctx, uniGroup); !errors.Is(err, domain.ErrDuplicateRecord) {
+		t.Fatalf("duplicate group error = %v, want ErrDuplicateRecord", err)
+	}
+	if bobGroups, err := groupRepo.ListByUser(ctx, bob.ID); err != nil || bobGroups == nil || len(bobGroups) != 0 {
+		t.Fatalf("Bob ListByUser(groups) = (%v, %v), want non-nil empty slice", bobGroups, err)
+	}
+	if _, err := groupRepo.GetByID(ctx, bob.ID, uniGroup.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob GetByID(uniGroup) = %v, want ErrNotFound", err)
+	}
+	if err := groupRepo.Delete(ctx, bob.ID, uniGroup.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob Delete(uniGroup) = %v, want ErrNotFound", err)
+	}
+
+	// Assign Alice's host to Universidad, then delete the group -> host remains with GroupID == "".
+	aliceHost.GroupID = uniGroup.ID
+	aliceHost.UpdatedAt = now.Add(3 * time.Minute)
+	if err := hostRepo.Update(ctx, aliceHost); err != nil {
+		t.Fatalf("assign host group error = %v", err)
+	}
+	gotWithGroup, err := hostRepo.GetByID(ctx, alice.ID, aliceHost.ID)
+	if err != nil || gotWithGroup.GroupID != uniGroup.ID {
+		t.Fatalf("expected GroupID %q, got (%+v, %v)", uniGroup.ID, gotWithGroup, err)
+	}
+	if err := groupRepo.Delete(ctx, alice.ID, uniGroup.ID); err != nil {
+		t.Fatalf("Alice Delete(uniGroup) error = %v", err)
+	}
+	gotAfterGroupDel, err := hostRepo.GetByID(ctx, alice.ID, aliceHost.ID)
+	if err != nil || gotAfterGroupDel.GroupID != "" {
+		t.Fatalf("expected ungrouped host after group delete, got (%+v, %v)", gotAfterGroupDel, err)
+	}
 }

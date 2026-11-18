@@ -10,6 +10,7 @@ Package ports defines hexagonal port interfaces for persistence, cryptography, S
 
 ## Index
 
+- [type HostGroupRepository](<#HostGroupRepository>)
 - [type HostKeyChallenge](<#HostKeyChallenge>)
 - [type HostKeyVerifier](<#HostKeyVerifier>)
 - [type HostRepository](<#HostRepository>)
@@ -30,6 +31,21 @@ Package ports defines hexagonal port interfaces for persistence, cryptography, S
 - [type TunnelRepository](<#TunnelRepository>)
 - [type UserRepository](<#UserRepository>)
 
+
+<a name="HostGroupRepository"></a>
+## type [HostGroupRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/repository.go#L57-L63>)
+
+HostGroupRepository persists user\-defined host instance groups scoped strictly by owner user ID.
+
+```go
+type HostGroupRepository interface {
+    Create(ctx context.Context, group domain.HostGroup) error
+    GetByID(ctx context.Context, ownerUserID, groupID string) (domain.HostGroup, error)
+    ListByUser(ctx context.Context, ownerUserID string) ([]domain.HostGroup, error)
+    Update(ctx context.Context, group domain.HostGroup) error
+    Delete(ctx context.Context, ownerUserID, groupID string) error
+}
+```
 
 <a name="HostKeyChallenge"></a>
 ## type [HostKeyChallenge](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/ssh_engine.go#L11-L18>)
