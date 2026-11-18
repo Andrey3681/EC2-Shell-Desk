@@ -50,6 +50,7 @@ func Run(assets fs.FS) error {
 	knownRepo := sqlite.NewKnownHostRepository(store)
 	groupRepo := sqlite.NewGroupRepository(store)
 	tunnelRepo := sqlite.NewTunnelRepository(store)
+	snippetRepo := sqlite.NewSnippetRepository(store)
 
 	sshManager := sshclient.NewManager(sftpclient.NewFromSSHClient)
 	localFS := winfs.NewWinFS()
@@ -61,6 +62,7 @@ func Run(assets fs.FS) error {
 	sessionSvc := services.NewSessionService(authSvc, hostRepo, knownRepo, vaultSvc, sshManager, bridge)
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, localFS, bridge)
 	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshManager, bridge)
+	snippetSvc := services.NewSnippetService(authSvc, snippetRepo, hostRepo, groupRepo, sessionSvc)
 
 	authHandler := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc)
 	keyHandler := app.NewKeyHandler(bridge, vaultSvc)
@@ -68,6 +70,7 @@ func Run(assets fs.FS) error {
 	termHandler := app.NewTerminalHandler(bridge, sessionSvc)
 	sftpHandler := app.NewSFTPHandler(bridge, transferSvc)
 	tunnelHandler := app.NewTunnelHandler(bridge, tunnelSvc)
+	snippetHandler := app.NewSnippetHandler(bridge, snippetSvc)
 
 	runErr := wails.Run(&options.App{
 		Title:     "EC2 Shell Desk",
@@ -110,6 +113,7 @@ func Run(assets fs.FS) error {
 			termHandler,
 			sftpHandler,
 			tunnelHandler,
+			snippetHandler,
 		},
 	})
 	if runErr != nil {

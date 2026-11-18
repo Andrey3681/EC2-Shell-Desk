@@ -60,6 +60,7 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	knownRepo := sqlite.NewKnownHostRepository(store)
 	groupRepo := sqlite.NewGroupRepository(store)
 	tunnelRepo := sqlite.NewTunnelRepository(store)
+	snippetRepo := sqlite.NewSnippetRepository(store)
 
 	bridge := app.NewEventBridge()
 	sshMgr := sshclient.NewManager(sftpclient.NewFromSSHClient)
@@ -69,12 +70,14 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	sessionSvc := services.NewSessionService(authSvc, hostRepo, knownRepo, vaultSvc, sshMgr, bridge)
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, winfs.NewWinFS(), bridge)
 	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshMgr, bridge)
+	snippetSvc := services.NewSnippetService(authSvc, snippetRepo, hostRepo, groupRepo, sessionSvc)
 
 	authH := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc)
 	keyH := app.NewKeyHandler(bridge, vaultSvc)
 	hostH := app.NewHostHandler(bridge, hostSvc)
 	sftpH := app.NewSFTPHandler(bridge, transferSvc)
 	tunnelH := app.NewTunnelHandler(bridge, tunnelSvc)
+	snippetH := app.NewSnippetHandler(bridge, snippetSvc)
 
 	status, err := authH.Status()
 	if err != nil || status.HasUsers || status.Unlocked {
@@ -138,6 +141,21 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	tunnels, err := tunnelH.ListTunnels()
 	if err != nil || len(tunnels) != 1 {
 		t.Fatalf("ListTunnels() = (%+v, %v)", tunnels, err)
+	}
+
+	snip, err := snippetH.CreateSnippet(services.SaveSnippetInput{
+		HostID:      host.ID,
+		GroupID:     group.ID,
+		Name:        "Check Disk",
+		Command:     "df -h",
+		AutoExecute: true,
+	})
+	if err != nil || snip.Name != "Check Disk" || snip.HostID != host.ID {
+		t.Fatalf("CreateSnippet() = (%+v, %v)", snip, err)
+	}
+	snips, err := snippetH.ListSnippets()
+	if err != nil || len(snips) != 1 {
+		t.Fatalf("ListSnippets() = (%+v, %v)", snips, err)
 	}
 
 	roots, err := sftpH.ListLocalRoots()
