@@ -219,3 +219,66 @@ func TestCommandSnippetValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestPrivateServiceValidateAndURL(t *testing.T) {
+	valid := domain.PrivateService{
+		ID:          "svc-1",
+		OwnerUserID: "user-1",
+		HostID:      "host-1",
+		Name:        "Grafana Metrics",
+		Preset:      domain.ServicePresetGrafana,
+		Protocol:    domain.ServiceProtocolHTTP,
+		RemoteHost:  "127.0.0.1",
+		RemotePort:  3001,
+		BasePath:    "/grafana",
+		LocalPort:   13001,
+		HealthPath:  "/api/health",
+		OpenMode:    domain.ServiceOpenModeBrowser,
+	}
+
+	tests := []struct {
+		name    string
+		mutate  func(s *domain.PrivateService)
+		wantErr error
+	}{
+		{name: "valid service", mutate: func(_ *domain.PrivateService) {}, wantErr: nil},
+		{name: "missing owner", mutate: func(s *domain.PrivateService) { s.OwnerUserID = "" }, wantErr: domain.ErrInvalidInput},
+		{name: "missing host", mutate: func(s *domain.PrivateService) { s.HostID = "" }, wantErr: domain.ErrInvalidInput},
+		{name: "empty name", mutate: func(s *domain.PrivateService) { s.Name = "   " }, wantErr: domain.ErrInvalidInput},
+		{name: "name too long", mutate: func(s *domain.PrivateService) { s.Name = string(make([]byte, domain.MaxServiceNameLength+1)) }, wantErr: domain.ErrInvalidInput},
+		{name: "unsupported preset", mutate: func(s *domain.PrivateService) { s.Preset = "invalid" }, wantErr: domain.ErrInvalidInput},
+		{name: "unsupported protocol", mutate: func(s *domain.PrivateService) { s.Protocol = "ftp" }, wantErr: domain.ErrInvalidInput},
+		{name: "empty remote host", mutate: func(s *domain.PrivateService) { s.RemoteHost = "   " }, wantErr: domain.ErrInvalidInput},
+		{name: "remote host whitespace", mutate: func(s *domain.PrivateService) { s.RemoteHost = "127.0. 0.1" }, wantErr: domain.ErrInvalidInput},
+		{name: "invalid remote port zero", mutate: func(s *domain.PrivateService) { s.RemotePort = 0 }, wantErr: domain.ErrInvalidInput},
+		{name: "invalid remote port too large", mutate: func(s *domain.PrivateService) { s.RemotePort = 70000 }, wantErr: domain.ErrInvalidInput},
+		{name: "invalid local port negative", mutate: func(s *domain.PrivateService) { s.LocalPort = -1 }, wantErr: domain.ErrInvalidInput},
+		{name: "base path whitespace", mutate: func(s *domain.PrivateService) { s.BasePath = "/api path" }, wantErr: domain.ErrInvalidInput},
+		{name: "health path whitespace", mutate: func(s *domain.PrivateService) { s.HealthPath = "/api /health" }, wantErr: domain.ErrInvalidInput},
+		{name: "unsupported open mode", mutate: func(s *domain.PrivateService) { s.OpenMode = "terminal" }, wantErr: domain.ErrInvalidInput},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := valid
+			tc.mutate(&s)
+			err := s.Validate()
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("Validate() error = %v, want %v", err, tc.wantErr)
+			}
+		})
+	}
+
+	// Test URL helper
+	u := valid.URL(13001)
+	if u != "http://127.0.0.1:13001/grafana" {
+		t.Errorf("URL() = %q, want http://127.0.0.1:13001/grafana", u)
+	}
+
+	rootSvc := valid
+	rootSvc.BasePath = "/"
+	rootSvc.Protocol = domain.ServiceProtocolHTTPS
+	if rootSvc.URL(8443) != "https://127.0.0.1:8443" {
+		t.Errorf("URL() root = %q, want https://127.0.0.1:8443", rootSvc.URL(8443))
+	}
+}

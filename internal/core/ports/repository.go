@@ -70,3 +70,14 @@ type SnippetRepository interface {
 	Update(ctx context.Context, snippet domain.CommandSnippet) error
 	Delete(ctx context.Context, ownerUserID, snippetID string) error
 }
+
+// ServiceRepository persists private observability and web services scoped strictly by owner user ID.
+type ServiceRepository interface {
+	Create(ctx context.Context, service domain.PrivateService) error
+	GetByID(ctx context.Context, ownerUserID, serviceID string) (domain.PrivateService, error)
+	ListByUser(ctx context.Context, ownerUserID string) ([]domain.PrivateService, error)
+	ListByHost(ctx context.Context, ownerUserID, hostID string) ([]domain.PrivateService, error)
+	Update(ctx context.Context, service domain.PrivateService) error
+	Delete(ctx context.Context, ownerUserID, serviceID string) error
+	CountByHost(ctx context.Context, ownerUserID, hostID string) (int, error)
+}
