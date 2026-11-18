@@ -333,4 +333,64 @@ func TestMultiUserIsolationAndCRUD(t *testing.T) {
 	if err := snippetRepo.Delete(ctx, alice.ID, snip.ID); err != nil {
 		t.Fatalf("Alice Delete(snippet) error = %v", err)
 	}
+
+	// Private Services CRUD, uniqueness by (owner_user_id, host_id, name), host query, and multi-user isolation.
+	serviceRepo := sqlite.NewServiceRepository(store)
+	service1 := domain.PrivateService{
+		ID:          "svc-1",
+		OwnerUserID: alice.ID,
+		HostID:      aliceHost.ID,
+		Name:        "Grafana",
+		Preset:      domain.ServicePresetGrafana,
+		Protocol:    domain.ServiceProtocolHTTP,
+		RemoteHost:  "127.0.0.1",
+		RemotePort:  3001,
+		BasePath:    "/grafana",
+		LocalPort:   13001,
+		HealthPath:  "/api/health",
+		OpenMode:    domain.ServiceOpenModeBrowser,
+		Notes:       "metrics dashboard",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := serviceRepo.Create(ctx, service1); err != nil {
+		t.Fatalf("Create(service) error = %v", err)
+	}
+	if err := serviceRepo.Create(ctx, service1); !errors.Is(err, domain.ErrDuplicateRecord) {
+		t.Fatalf("duplicate service error = %v, want ErrDuplicateRecord", err)
+	}
+
+	// Bob cannot access or delete Alice's service
+	if bobSvcs, err := serviceRepo.ListByUser(ctx, bob.ID); err != nil || len(bobSvcs) != 0 {
+		t.Fatalf("Bob ListByUser(services) = (%v, %v), want empty slice", bobSvcs, err)
+	}
+	if _, err := serviceRepo.GetByID(ctx, bob.ID, service1.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob GetByID(service) = %v, want ErrNotFound", err)
+	}
+	if err := serviceRepo.Delete(ctx, bob.ID, service1.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob Delete(service) = %v, want ErrNotFound", err)
+	}
+
+	// Alice queries
+	byHost, err := serviceRepo.ListByHost(ctx, alice.ID, aliceHost.ID)
+	if err != nil || len(byHost) != 1 || byHost[0].Name != "Grafana" {
+		t.Fatalf("ListByHost() = (%v, %v)", byHost, err)
+	}
+	svcCount, err := serviceRepo.CountByHost(ctx, alice.ID, aliceHost.ID)
+	if err != nil || svcCount != 1 {
+		t.Fatalf("CountByHost() = (%d, %v), want 1", svcCount, err)
+	}
+
+	service1.Notes = "updated notes"
+	service1.UpdatedAt = now.Add(time.Minute)
+	if err := serviceRepo.Update(ctx, service1); err != nil {
+		t.Fatalf("Update(service) error = %v", err)
+	}
+	gotSvc, err := serviceRepo.GetByID(ctx, alice.ID, service1.ID)
+	if err != nil || gotSvc.Notes != "updated notes" {
+		t.Fatalf("GetByID(service) = (%+v, %v)", gotSvc, err)
+	}
+	if err := serviceRepo.Delete(ctx, alice.ID, service1.ID); err != nil {
+		t.Fatalf("Delete(service) error = %v", err)
+	}
 }
