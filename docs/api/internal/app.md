@@ -65,6 +65,14 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
   - [func \(h \*SFTPHandler\) RenameRemote\(sessionID, oldPath, newPath string\) error](<#SFTPHandler.RenameRemote>)
   - [func \(h \*SFTPHandler\) StartDownload\(sessionID, remoteFilePath, localDirPath string\) \(domain.TransferTask, error\)](<#SFTPHandler.StartDownload>)
   - [func \(h \*SFTPHandler\) StartUpload\(sessionID, localFilePath, remoteDirPath string\) \(domain.TransferTask, error\)](<#SFTPHandler.StartUpload>)
+- [type SnippetHandler](<#SnippetHandler>)
+  - [func NewSnippetHandler\(bridge \*EventBridge, snippets \*services.SnippetService\) \*SnippetHandler](<#NewSnippetHandler>)
+  - [func \(h \*SnippetHandler\) BroadcastSnippet\(sessionIDs \[\]string, snippetID string\) error](<#SnippetHandler.BroadcastSnippet>)
+  - [func \(h \*SnippetHandler\) CreateSnippet\(input services.SaveSnippetInput\) \(domain.CommandSnippet, error\)](<#SnippetHandler.CreateSnippet>)
+  - [func \(h \*SnippetHandler\) DeleteSnippet\(snippetID string\) error](<#SnippetHandler.DeleteSnippet>)
+  - [func \(h \*SnippetHandler\) ListSnippets\(\) \(\[\]domain.CommandSnippet, error\)](<#SnippetHandler.ListSnippets>)
+  - [func \(h \*SnippetHandler\) RunSnippetInSession\(sessionID, snippetID string\) error](<#SnippetHandler.RunSnippetInSession>)
+  - [func \(h \*SnippetHandler\) UpdateSnippet\(input services.SaveSnippetInput\) \(domain.CommandSnippet, error\)](<#SnippetHandler.UpdateSnippet>)
 - [type TOFUChallengeEvent](<#TOFUChallengeEvent>)
 - [type TerminalClosedEvent](<#TerminalClosedEvent>)
 - [type TerminalHandler](<#TerminalHandler>)
@@ -596,6 +604,80 @@ func (h *SFTPHandler) StartUpload(sessionID, localFilePath, remoteDirPath string
 ```
 
 StartUpload queues an SFTP upload of localFilePath into remoteDirPath.
+
+<a name="SnippetHandler"></a>
+## type [SnippetHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/snippet_handler.go#L9-L12>)
+
+SnippetHandler exposes reusable command snippet CRUD and terminal execution bindings to Wails.
+
+```go
+type SnippetHandler struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewSnippetHandler"></a>
+### func [NewSnippetHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/snippet_handler.go#L15>)
+
+```go
+func NewSnippetHandler(bridge *EventBridge, snippets *services.SnippetService) *SnippetHandler
+```
+
+NewSnippetHandler constructs a SnippetHandler wired to SnippetService.
+
+<a name="SnippetHandler.BroadcastSnippet"></a>
+### func \(\*SnippetHandler\) [BroadcastSnippet](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/snippet_handler.go#L48>)
+
+```go
+func (h *SnippetHandler) BroadcastSnippet(sessionIDs []string, snippetID string) error
+```
+
+BroadcastSnippet executes or pastes an owned snippet across multiple active SSH sessions.
+
+<a name="SnippetHandler.CreateSnippet"></a>
+### func \(\*SnippetHandler\) [CreateSnippet](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/snippet_handler.go#L28>)
+
+```go
+func (h *SnippetHandler) CreateSnippet(input services.SaveSnippetInput) (domain.CommandSnippet, error)
+```
+
+CreateSnippet validates and persists a new command snippet owned by the active user.
+
+<a name="SnippetHandler.DeleteSnippet"></a>
+### func \(\*SnippetHandler\) [DeleteSnippet](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/snippet_handler.go#L38>)
+
+```go
+func (h *SnippetHandler) DeleteSnippet(snippetID string) error
+```
+
+DeleteSnippet deletes a command snippet owned by the active user.
+
+<a name="SnippetHandler.ListSnippets"></a>
+### func \(\*SnippetHandler\) [ListSnippets](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/snippet_handler.go#L23>)
+
+```go
+func (h *SnippetHandler) ListSnippets() ([]domain.CommandSnippet, error)
+```
+
+ListSnippets returns saved command snippets owned by the active user.
+
+<a name="SnippetHandler.RunSnippetInSession"></a>
+### func \(\*SnippetHandler\) [RunSnippetInSession](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/snippet_handler.go#L43>)
+
+```go
+func (h *SnippetHandler) RunSnippetInSession(sessionID, snippetID string) error
+```
+
+RunSnippetInSession executes or pastes an owned snippet into the active SSH terminal session.
+
+<a name="SnippetHandler.UpdateSnippet"></a>
+### func \(\*SnippetHandler\) [UpdateSnippet](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/snippet_handler.go#L33>)
+
+```go
+func (h *SnippetHandler) UpdateSnippet(input services.SaveSnippetInput) (domain.CommandSnippet, error)
+```
+
+UpdateSnippet updates an existing command snippet owned by the active user.
 
 <a name="TOFUChallengeEvent"></a>
 ## type [TOFUChallengeEvent](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L20-L26>)

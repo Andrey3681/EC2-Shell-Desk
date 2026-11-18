@@ -25,6 +25,7 @@ Package ports defines hexagonal port interfaces for persistence, cryptography, S
 - [type SFTPClient](<#SFTPClient>)
 - [type SSHConnectRequest](<#SSHConnectRequest>)
 - [type SSHSessionManager](<#SSHSessionManager>)
+- [type SnippetRepository](<#SnippetRepository>)
 - [type TransferProgressFunc](<#TransferProgressFunc>)
 - [type TunnelForwardRequest](<#TunnelForwardRequest>)
 - [type TunnelHandle](<#TunnelHandle>)
@@ -244,6 +245,21 @@ SSHSessionManager establishes authenticated SSH connections, interactive PTY cha
 type SSHSessionManager interface {
     ConnectPTY(ctx context.Context, req SSHConnectRequest) (PTYSession, error)
     StartLocalForward(ctx context.Context, req TunnelForwardRequest) (TunnelHandle, error)
+}
+```
+
+<a name="SnippetRepository"></a>
+## type [SnippetRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/repository.go#L66-L72>)
+
+SnippetRepository persists reusable command snippets scoped strictly by owner user ID.
+
+```go
+type SnippetRepository interface {
+    Create(ctx context.Context, snippet domain.CommandSnippet) error
+    GetByID(ctx context.Context, ownerUserID, snippetID string) (domain.CommandSnippet, error)
+    ListByUser(ctx context.Context, ownerUserID string) ([]domain.CommandSnippet, error)
+    Update(ctx context.Context, snippet domain.CommandSnippet) error
+    Delete(ctx context.Context, ownerUserID, snippetID string) error
 }
 ```
 

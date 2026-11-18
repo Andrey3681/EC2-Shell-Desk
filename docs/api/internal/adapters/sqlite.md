@@ -38,6 +38,13 @@ Package sqlite implements repository ports using pure\-Go SQLite persistence wit
   - [func \(r \*KnownHostRepository\) GetByHostPort\(ctx context.Context, ownerUserID, hostAddress string, port int\) \(domain.KnownHost, error\)](<#KnownHostRepository.GetByHostPort>)
   - [func \(r \*KnownHostRepository\) ListByUser\(ctx context.Context, ownerUserID string\) \(\[\]domain.KnownHost, error\)](<#KnownHostRepository.ListByUser>)
   - [func \(r \*KnownHostRepository\) Upsert\(ctx context.Context, knownHost domain.KnownHost\) error](<#KnownHostRepository.Upsert>)
+- [type SnippetRepository](<#SnippetRepository>)
+  - [func NewSnippetRepository\(store \*Store\) \*SnippetRepository](<#NewSnippetRepository>)
+  - [func \(r \*SnippetRepository\) Create\(ctx context.Context, snippet domain.CommandSnippet\) error](<#SnippetRepository.Create>)
+  - [func \(r \*SnippetRepository\) Delete\(ctx context.Context, ownerUserID, snippetID string\) error](<#SnippetRepository.Delete>)
+  - [func \(r \*SnippetRepository\) GetByID\(ctx context.Context, ownerUserID, snippetID string\) \(domain.CommandSnippet, error\)](<#SnippetRepository.GetByID>)
+  - [func \(r \*SnippetRepository\) ListByUser\(ctx context.Context, ownerUserID string\) \(\[\]domain.CommandSnippet, error\)](<#SnippetRepository.ListByUser>)
+  - [func \(r \*SnippetRepository\) Update\(ctx context.Context, snippet domain.CommandSnippet\) error](<#SnippetRepository.Update>)
 - [type Store](<#Store>)
   - [func Open\(ctx context.Context, dbPath string\) \(\*Store, error\)](<#Open>)
   - [func \(s \*Store\) Close\(\) error](<#Store.Close>)
@@ -317,6 +324,71 @@ func (r *KnownHostRepository) Upsert(ctx context.Context, knownHost domain.Known
 ```
 
 Upsert stores or updates a trusted host public key fingerprint for a specific user.
+
+<a name="SnippetRepository"></a>
+## type [SnippetRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/snippet_repo.go#L13-L15>)
+
+SnippetRepository implements ports.SnippetRepository backed by SQLite with strict owner\_user\_id isolation.
+
+```go
+type SnippetRepository struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewSnippetRepository"></a>
+### func [NewSnippetRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/snippet_repo.go#L18>)
+
+```go
+func NewSnippetRepository(store *Store) *SnippetRepository
+```
+
+NewSnippetRepository creates a SnippetRepository using the provided SQLite Store.
+
+<a name="SnippetRepository.Create"></a>
+### func \(\*SnippetRepository\) [Create](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/snippet_repo.go#L23>)
+
+```go
+func (r *SnippetRepository) Create(ctx context.Context, snippet domain.CommandSnippet) error
+```
+
+Create inserts a new CommandSnippet owned by snippet.OwnerUserID.
+
+<a name="SnippetRepository.Delete"></a>
+### func \(\*SnippetRepository\) [Delete](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/snippet_repo.go#L162>)
+
+```go
+func (r *SnippetRepository) Delete(ctx context.Context, ownerUserID, snippetID string) error
+```
+
+Delete removes a CommandSnippet only if owned by ownerUserID.
+
+<a name="SnippetRepository.GetByID"></a>
+### func \(\*SnippetRepository\) [GetByID](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/snippet_repo.go#L66>)
+
+```go
+func (r *SnippetRepository) GetByID(ctx context.Context, ownerUserID, snippetID string) (domain.CommandSnippet, error)
+```
+
+GetByID retrieves a CommandSnippet only if it belongs to ownerUserID.
+
+<a name="SnippetRepository.ListByUser"></a>
+### func \(\*SnippetRepository\) [ListByUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/snippet_repo.go#L83>)
+
+```go
+func (r *SnippetRepository) ListByUser(ctx context.Context, ownerUserID string) ([]domain.CommandSnippet, error)
+```
+
+ListByUser returns all CommandSnippet records belonging strictly to ownerUserID.
+
+<a name="SnippetRepository.Update"></a>
+### func \(\*SnippetRepository\) [Update](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/snippet_repo.go#L113>)
+
+```go
+func (r *SnippetRepository) Update(ctx context.Context, snippet domain.CommandSnippet) error
+```
+
+Update modifies an existing CommandSnippet only if owned by snippet.OwnerUserID.
 
 <a name="Store"></a>
 ## type [Store](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sqlite/db.go#L25-L27>)

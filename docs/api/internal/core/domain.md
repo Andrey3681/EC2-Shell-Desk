@@ -16,6 +16,8 @@ Package domain defines pure business entities, invariants, and sentinel errors f
 - [func ValidateKeyName\(name string\) error](<#ValidateKeyName>)
 - [func ValidatePassword\(password string\) error](<#ValidatePassword>)
 - [func ValidateUsername\(username string\) error](<#ValidateUsername>)
+- [type CommandSnippet](<#CommandSnippet>)
+  - [func \(s CommandSnippet\) Validate\(\) error](<#CommandSnippet.Validate>)
 - [type Environment](<#Environment>)
 - [type FileEntry](<#FileEntry>)
 - [type HostGroup](<#HostGroup>)
@@ -41,6 +43,17 @@ Package domain defines pure business entities, invariants, and sentinel errors f
 
 
 ## Constants
+
+<a name="MaxSnippetNameLength"></a>
+
+```go
+const (
+    // MaxSnippetNameLength defines the maximum allowed character length for a CommandSnippet name.
+    MaxSnippetNameLength = 128
+    // MaxSnippetCommandLength defines the maximum allowed byte length for a CommandSnippet body.
+    MaxSnippetCommandLength = 16 * 1024
+)
+```
 
 <a name="MinUsernameLength"></a>
 
@@ -173,6 +186,35 @@ func ValidateUsername(username string) error
 ```
 
 ValidateUsername checks whether a username satisfies length and character constraints.
+
+<a name="CommandSnippet"></a>
+## type [CommandSnippet](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/snippet.go#L17-L28>)
+
+CommandSnippet represents a reusable shell command or deployment script owned by a local user.
+
+```go
+type CommandSnippet struct {
+    ID          string    `json:"id"`
+    OwnerUserID string    `json:"ownerUserId"`
+    HostID      string    `json:"hostId"`
+    GroupID     string    `json:"groupId"`
+    Name        string    `json:"name"`
+    Command     string    `json:"command"`
+    AutoExecute bool      `json:"autoExecute"`
+    Notes       string    `json:"notes"`
+    CreatedAt   time.Time `json:"createdAt"`
+    UpdatedAt   time.Time `json:"updatedAt"`
+}
+```
+
+<a name="CommandSnippet.Validate"></a>
+### func \(CommandSnippet\) [Validate](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/snippet.go#L31>)
+
+```go
+func (s CommandSnippet) Validate() error
+```
+
+Validate checks that required CommandSnippet fields and size bounds are valid.
 
 <a name="Environment"></a>
 ## type [Environment](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/host_instance.go#L10>)

@@ -32,6 +32,7 @@ Package services implements application use cases orchestrating authentication, 
   - [func \(s \*HostService\) RenameGroup\(ctx context.Context, groupID, name string\) \(domain.HostGroup, error\)](<#HostService.RenameGroup>)
   - [func \(s \*HostService\) UpdateHost\(ctx context.Context, input SaveHostInput\) \(domain.HostInstance, error\)](<#HostService.UpdateHost>)
 - [type SaveHostInput](<#SaveHostInput>)
+- [type SaveSnippetInput](<#SaveSnippetInput>)
 - [type SaveTunnelInput](<#SaveTunnelInput>)
 - [type SessionService](<#SessionService>)
   - [func NewSessionService\(auth \*AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, vault \*VaultService, sshManager ports.SSHSessionManager, sink TerminalEventSink\) \*SessionService](<#NewSessionService>)
@@ -44,6 +45,14 @@ Package services implements application use cases orchestrating authentication, 
   - [func \(s \*SessionService\) RemoveKnownHost\(ctx context.Context, knownHostID string\) error](<#SessionService.RemoveKnownHost>)
   - [func \(s \*SessionService\) ResizeTerminal\(sessionID string, cols, rows int\) error](<#SessionService.ResizeTerminal>)
   - [func \(s \*SessionService\) WriteTerminal\(sessionID string, data \[\]byte\) error](<#SessionService.WriteTerminal>)
+- [type SnippetService](<#SnippetService>)
+  - [func NewSnippetService\(auth \*AuthService, snippets ports.SnippetRepository, hosts ports.HostRepository, groups ports.HostGroupRepository, sessions \*SessionService\) \*SnippetService](<#NewSnippetService>)
+  - [func \(s \*SnippetService\) BroadcastSnippet\(ctx context.Context, sessionIDs \[\]string, snippetID string\) error](<#SnippetService.BroadcastSnippet>)
+  - [func \(s \*SnippetService\) CreateSnippet\(ctx context.Context, input SaveSnippetInput\) \(domain.CommandSnippet, error\)](<#SnippetService.CreateSnippet>)
+  - [func \(s \*SnippetService\) DeleteSnippet\(ctx context.Context, snippetID string\) error](<#SnippetService.DeleteSnippet>)
+  - [func \(s \*SnippetService\) ListSnippets\(ctx context.Context\) \(\[\]domain.CommandSnippet, error\)](<#SnippetService.ListSnippets>)
+  - [func \(s \*SnippetService\) RunSnippetInSession\(ctx context.Context, sessionID, snippetID string\) error](<#SnippetService.RunSnippetInSession>)
+  - [func \(s \*SnippetService\) UpdateSnippet\(ctx context.Context, input SaveSnippetInput\) \(domain.CommandSnippet, error\)](<#SnippetService.UpdateSnippet>)
 - [type TOFUTrustPromptFunc](<#TOFUTrustPromptFunc>)
 - [type TerminalEventSink](<#TerminalEventSink>)
 - [type TransferEventSink](<#TransferEventSink>)
@@ -296,6 +305,23 @@ type SaveHostInput struct {
 }
 ```
 
+<a name="SaveSnippetInput"></a>
+## type [SaveSnippetInput](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/snippet_service.go#L16-L24>)
+
+SaveSnippetInput captures fields required to create or update a reusable CommandSnippet.
+
+```go
+type SaveSnippetInput struct {
+    ID          string `json:"id,omitempty"`
+    HostID      string `json:"hostId"`
+    GroupID     string `json:"groupId"`
+    Name        string `json:"name"`
+    Command     string `json:"command"`
+    AutoExecute bool   `json:"autoExecute"`
+    Notes       string `json:"notes"`
+}
+```
+
 <a name="SaveTunnelInput"></a>
 ## type [SaveTunnelInput](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L21-L31>)
 
@@ -415,6 +441,80 @@ func (s *SessionService) WriteTerminal(sessionID string, data []byte) error
 ```
 
 WriteTerminal sends user input bytes to an active PTY session owned by the current user.
+
+<a name="SnippetService"></a>
+## type [SnippetService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/snippet_service.go#L27-L33>)
+
+SnippetService manages user\-isolated command snippets and executes them in active SSH PTY sessions.
+
+```go
+type SnippetService struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewSnippetService"></a>
+### func [NewSnippetService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/snippet_service.go#L36-L42>)
+
+```go
+func NewSnippetService(auth *AuthService, snippets ports.SnippetRepository, hosts ports.HostRepository, groups ports.HostGroupRepository, sessions *SessionService) *SnippetService
+```
+
+NewSnippetService constructs a SnippetService bound to auth, snippet/host/group repositories, and active sessions.
+
+<a name="SnippetService.BroadcastSnippet"></a>
+### func \(\*SnippetService\) [BroadcastSnippet](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/snippet_service.go#L174>)
+
+```go
+func (s *SnippetService) BroadcastSnippet(ctx context.Context, sessionIDs []string, snippetID string) error
+```
+
+BroadcastSnippet executes an owned snippet across all specified active SSH sessions owned by the user.
+
+<a name="SnippetService.CreateSnippet"></a>
+### func \(\*SnippetService\) [CreateSnippet](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/snippet_service.go#L53>)
+
+```go
+func (s *SnippetService) CreateSnippet(ctx context.Context, input SaveSnippetInput) (domain.CommandSnippet, error)
+```
+
+CreateSnippet validates and stores a new CommandSnippet owned by the authenticated user.
+
+<a name="SnippetService.DeleteSnippet"></a>
+### func \(\*SnippetService\) [DeleteSnippet](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/snippet_service.go#L134>)
+
+```go
+func (s *SnippetService) DeleteSnippet(ctx context.Context, snippetID string) error
+```
+
+DeleteSnippet removes a CommandSnippet owned by the authenticated user.
+
+<a name="SnippetService.ListSnippets"></a>
+### func \(\*SnippetService\) [ListSnippets](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/snippet_service.go#L83>)
+
+```go
+func (s *SnippetService) ListSnippets(ctx context.Context) ([]domain.CommandSnippet, error)
+```
+
+ListSnippets returns all CommandSnippet records belonging strictly to the authenticated user.
+
+<a name="SnippetService.RunSnippetInSession"></a>
+### func \(\*SnippetService\) [RunSnippetInSession](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/snippet_service.go#L151>)
+
+```go
+func (s *SnippetService) RunSnippetInSession(ctx context.Context, sessionID, snippetID string) error
+```
+
+RunSnippetInSession writes an owned snippet's command into an active owned SSH PTY session.
+
+<a name="SnippetService.UpdateSnippet"></a>
+### func \(\*SnippetService\) [UpdateSnippet](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/snippet_service.go#L96>)
+
+```go
+func (s *SnippetService) UpdateSnippet(ctx context.Context, input SaveSnippetInput) (domain.CommandSnippet, error)
+```
+
+UpdateSnippet modifies an existing CommandSnippet owned by the authenticated user.
 
 <a name="TOFUTrustPromptFunc"></a>
 ## type [TOFUTrustPromptFunc](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/session_service.go#L27>)
