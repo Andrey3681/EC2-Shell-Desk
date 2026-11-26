@@ -126,6 +126,9 @@ var (
     // ErrInvalidCredentials indicates an unrecognized username or incorrect password.
     ErrInvalidCredentials = errors.New("invalid credentials")
 
+    // ErrTooManyAttempts indicates that local authentication is temporarily rate-limited after consecutive failed attempts.
+    ErrTooManyAttempts = errors.New("too many failed login attempts")
+
     // ErrUserAlreadyExists indicates that a user with the requested username already exists.
     ErrUserAlreadyExists = errors.New("user already exists")
 
@@ -358,32 +361,33 @@ type KnownHost struct {
 ```
 
 <a name="PrivateService"></a>
-## type [PrivateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L70-L86>)
+## type [PrivateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L70-L87>)
 
 PrivateService represents a user\-configured internal web service running on an EC2 instance / VM.
 
 ```go
 type PrivateService struct {
-    ID          string          `json:"id"`
-    OwnerUserID string          `json:"ownerUserId"`
-    HostID      string          `json:"hostId"`
-    Name        string          `json:"name"`
-    Preset      ServicePreset   `json:"preset"`
-    Protocol    ServiceProtocol `json:"protocol"`
-    RemoteHost  string          `json:"remoteHost"`
-    RemotePort  int             `json:"remotePort"`
-    BasePath    string          `json:"basePath"`
-    LocalPort   int             `json:"localPort"`
-    HealthPath  string          `json:"healthPath"`
-    OpenMode    ServiceOpenMode `json:"openMode"`
-    Notes       string          `json:"notes"`
-    CreatedAt   time.Time       `json:"createdAt"`
-    UpdatedAt   time.Time       `json:"updatedAt"`
+    ID               string          `json:"id"`
+    OwnerUserID      string          `json:"ownerUserId"`
+    HostID           string          `json:"hostId"`
+    Name             string          `json:"name"`
+    Preset           ServicePreset   `json:"preset"`
+    Protocol         ServiceProtocol `json:"protocol"`
+    RemoteHost       string          `json:"remoteHost"`
+    RemotePort       int             `json:"remotePort"`
+    BasePath         string          `json:"basePath"`
+    LocalPort        int             `json:"localPort"`
+    HealthPath       string          `json:"healthPath"`
+    OpenMode         ServiceOpenMode `json:"openMode"`
+    AllowInsecureTLS bool            `json:"allowInsecureTls"`
+    Notes            string          `json:"notes"`
+    CreatedAt        time.Time       `json:"createdAt"`
+    UpdatedAt        time.Time       `json:"updatedAt"`
 }
 ```
 
 <a name="PrivateService.NormalizedBasePath"></a>
-### func \(PrivateService\) [NormalizedBasePath](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L137>)
+### func \(PrivateService\) [NormalizedBasePath](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L138>)
 
 ```go
 func (s PrivateService) NormalizedBasePath() string
@@ -392,7 +396,7 @@ func (s PrivateService) NormalizedBasePath() string
 NormalizedBasePath returns sanitized base path starting with / or empty string if root.
 
 <a name="PrivateService.NormalizedHealthPath"></a>
-### func \(PrivateService\) [NormalizedHealthPath](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L149>)
+### func \(PrivateService\) [NormalizedHealthPath](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L150>)
 
 ```go
 func (s PrivateService) NormalizedHealthPath() string
@@ -401,7 +405,7 @@ func (s PrivateService) NormalizedHealthPath() string
 NormalizedHealthPath returns the effective health probe path.
 
 <a name="PrivateService.URL"></a>
-### func \(PrivateService\) [URL](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L179>)
+### func \(PrivateService\) [URL](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L180>)
 
 ```go
 func (s PrivateService) URL(localPort int) string
@@ -410,7 +414,7 @@ func (s PrivateService) URL(localPort int) string
 URL constructs a full loopback URL for the service based on local bind port and base path.
 
 <a name="PrivateService.Validate"></a>
-### func \(PrivateService\) [Validate](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L89>)
+### func \(PrivateService\) [Validate](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L90>)
 
 ```go
 func (s PrivateService) Validate() error
@@ -591,7 +595,7 @@ const (
 ```
 
 <a name="ServiceRuntimeStatus"></a>
-## type [ServiceRuntimeStatus](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L165-L176>)
+## type [ServiceRuntimeStatus](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/domain/private_service.go#L166-L177>)
 
 ServiceRuntimeStatus represents real\-time operational state of a private service tunnel.
 

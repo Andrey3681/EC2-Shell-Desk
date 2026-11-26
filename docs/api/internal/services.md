@@ -20,8 +20,9 @@ Package services implements application use cases orchestrating authentication, 
   - [func \(s \*AuthService\) ListUsers\(ctx context.Context\) \(\[\]domain.UserProfile, error\)](<#AuthService.ListUsers>)
   - [func \(s \*AuthService\) Lock\(\)](<#AuthService.Lock>)
   - [func \(s \*AuthService\) Login\(ctx context.Context, username, password string\) \(domain.UserProfile, error\)](<#AuthService.Login>)
+  - [func \(s \*AuthService\) SetLoginBackoff\(maxFailures int, baseDelay, maxDelay time.Duration\)](<#AuthService.SetLoginBackoff>)
 - [type HostService](<#HostService>)
-  - [func NewHostService\(auth \*AuthService, hosts ports.HostRepository, keys ports.KeyRepository, groups ports.HostGroupRepository, tunnels ports.TunnelRepository\) \*HostService](<#NewHostService>)
+  - [func NewHostService\(auth \*AuthService, hosts ports.HostRepository, keys ports.KeyRepository, groups ports.HostGroupRepository, tunnels ports.TunnelRepository, services ports.ServiceRepository\) \*HostService](<#NewHostService>)
   - [func \(s \*HostService\) CreateGroup\(ctx context.Context, name string\) \(domain.HostGroup, error\)](<#HostService.CreateGroup>)
   - [func \(s \*HostService\) CreateHost\(ctx context.Context, input SaveHostInput\) \(domain.HostInstance, error\)](<#HostService.CreateHost>)
   - [func \(s \*HostService\) DeleteGroup\(ctx context.Context, groupID string\) error](<#HostService.DeleteGroup>)
@@ -32,14 +33,14 @@ Package services implements application use cases orchestrating authentication, 
   - [func \(s \*HostService\) RenameGroup\(ctx context.Context, groupID, name string\) \(domain.HostGroup, error\)](<#HostService.RenameGroup>)
   - [func \(s \*HostService\) UpdateHost\(ctx context.Context, input SaveHostInput\) \(domain.HostInstance, error\)](<#HostService.UpdateHost>)
 - [type ObservabilityService](<#ObservabilityService>)
-  - [func NewObservabilityService\(auth \*AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, services ports.ServiceRepository, vault \*VaultService, sshManager ports.SSHSessionManager, sink ServiceEventSink\) \*ObservabilityService](<#NewObservabilityService>)
+  - [func NewObservabilityService\(auth \*AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, services ports.ServiceRepository, vault \*VaultService, sshManager ports.SSHSessionManager, prober ports.HealthProber, sink ServiceEventSink\) \*ObservabilityService](<#NewObservabilityService>)
   - [func \(s \*ObservabilityService\) CloseAll\(\)](<#ObservabilityService.CloseAll>)
   - [func \(s \*ObservabilityService\) CreateService\(ctx context.Context, input SaveServiceInput\) \(domain.PrivateService, error\)](<#ObservabilityService.CreateService>)
   - [func \(s \*ObservabilityService\) DeleteService\(ctx context.Context, serviceID string\) error](<#ObservabilityService.DeleteService>)
   - [func \(s \*ObservabilityService\) ListServices\(ctx context.Context\) \(\[\]domain.PrivateService, error\)](<#ObservabilityService.ListServices>)
   - [func \(s \*ObservabilityService\) ListServicesByHost\(ctx context.Context, hostID string\) \(\[\]domain.PrivateService, error\)](<#ObservabilityService.ListServicesByHost>)
   - [func \(s \*ObservabilityService\) ListStatuses\(\) \(\[\]domain.ServiceRuntimeStatus, error\)](<#ObservabilityService.ListStatuses>)
-  - [func \(s \*ObservabilityService\) ProbeServiceHealth\(ctx context.Context, serviceID string\) domain.ServiceRuntimeStatus](<#ObservabilityService.ProbeServiceHealth>)
+  - [func \(s \*ObservabilityService\) ProbeServiceHealth\(ctx context.Context, serviceID string\) \(domain.ServiceRuntimeStatus, error\)](<#ObservabilityService.ProbeServiceHealth>)
   - [func \(s \*ObservabilityService\) StartService\(ctx context.Context, serviceID string, passwordFallback string, tofuConfirm TOFUTrustPromptFunc\) \(domain.ServiceRuntimeStatus, error\)](<#ObservabilityService.StartService>)
   - [func \(s \*ObservabilityService\) StopService\(serviceID string\) error](<#ObservabilityService.StopService>)
   - [func \(s \*ObservabilityService\) UpdateService\(ctx context.Context, input SaveServiceInput\) \(domain.PrivateService, error\)](<#ObservabilityService.UpdateService>)
@@ -86,8 +87,10 @@ Package services implements application use cases orchestrating authentication, 
   - [func \(s \*TransferService\) RemoteWorkingDir\(ctx context.Context, sessionID string\) \(string, error\)](<#TransferService.RemoteWorkingDir>)
   - [func \(s \*TransferService\) RenameLocal\(ctx context.Context, oldPath, newPath string\) error](<#TransferService.RenameLocal>)
   - [func \(s \*TransferService\) RenameRemote\(ctx context.Context, sessionID, oldPath, newPath string\) error](<#TransferService.RenameRemote>)
+  - [func \(s \*TransferService\) SetMaxHistory\(limit int\)](<#TransferService.SetMaxHistory>)
   - [func \(s \*TransferService\) StartDownload\(sessionID, remotePath, localPath string\) \(domain.TransferTask, error\)](<#TransferService.StartDownload>)
   - [func \(s \*TransferService\) StartUpload\(sessionID, localPath, remotePath string\) \(domain.TransferTask, error\)](<#TransferService.StartUpload>)
+  - [func \(s \*TransferService\) StartUploadDirectory\(sessionID, localDirPath, remoteTargetDir string\) \(domain.TransferTask, error\)](<#TransferService.StartUploadDirectory>)
 - [type TunnelEventSink](<#TunnelEventSink>)
 - [type TunnelService](<#TunnelService>)
   - [func NewTunnelService\(auth \*AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, tunnels ports.TunnelRepository, vault \*VaultService, sshManager ports.SSHSessionManager, sink TunnelEventSink\) \*TunnelService](<#NewTunnelService>)
@@ -108,7 +111,7 @@ Package services implements application use cases orchestrating authentication, 
 
 
 <a name="AuthService"></a>
-## type [AuthService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L17-L24>)
+## type [AuthService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L29-L43>)
 
 AuthService manages local user bootstrapping, authentication, and in\-memory vault unlocking.
 
@@ -119,7 +122,7 @@ type AuthService struct {
 ```
 
 <a name="NewAuthService"></a>
-### func [NewAuthService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L27>)
+### func [NewAuthService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L46>)
 
 ```go
 func NewAuthService(users ports.UserRepository, hasher ports.PasswordHasher, encrypt ports.KeyEncryptor) *AuthService
@@ -128,7 +131,7 @@ func NewAuthService(users ports.UserRepository, hasher ports.PasswordHasher, enc
 NewAuthService constructs an AuthService with the required repository and cryptography ports.
 
 <a name="AuthService.ActiveVaultCredentials"></a>
-### func \(\*AuthService\) [ActiveVaultCredentials](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L138>)
+### func \(\*AuthService\) [ActiveVaultCredentials](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L189>)
 
 ```go
 func (s *AuthService) ActiveVaultCredentials() (string, []byte, error)
@@ -137,7 +140,7 @@ func (s *AuthService) ActiveVaultCredentials() (string, []byte, error)
 ActiveVaultCredentials returns the active user ID and a copy of the unlocked vault master key. Callers must wipe the returned key slice when finished.
 
 <a name="AuthService.BootstrapInitialUser"></a>
-### func \(\*AuthService\) [BootstrapInitialUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L45>)
+### func \(\*AuthService\) [BootstrapInitialUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L84>)
 
 ```go
 func (s *AuthService) BootstrapInitialUser(ctx context.Context, username, password string) (domain.UserProfile, error)
@@ -146,7 +149,7 @@ func (s *AuthService) BootstrapInitialUser(ctx context.Context, username, passwo
 BootstrapInitialUser creates the first default local user and unlocks its vault on initial launch.
 
 <a name="AuthService.CreateUser"></a>
-### func \(\*AuthService\) [CreateUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L70>)
+### func \(\*AuthService\) [CreateUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L109>)
 
 ```go
 func (s *AuthService) CreateUser(ctx context.Context, username, password string) (domain.UserProfile, error)
@@ -155,7 +158,7 @@ func (s *AuthService) CreateUser(ctx context.Context, username, password string)
 CreateUser registers an additional isolated local user without modifying the current session.
 
 <a name="AuthService.CurrentUser"></a>
-### func \(\*AuthService\) [CurrentUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L127>)
+### func \(\*AuthService\) [CurrentUser](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L178>)
 
 ```go
 func (s *AuthService) CurrentUser() (domain.UserProfile, error)
@@ -164,7 +167,7 @@ func (s *AuthService) CurrentUser() (domain.UserProfile, error)
 CurrentUser returns the currently authenticated user profile or domain.ErrVaultLocked if locked.
 
 <a name="AuthService.HasUsers"></a>
-### func \(\*AuthService\) [HasUsers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L36>)
+### func \(\*AuthService\) [HasUsers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L75>)
 
 ```go
 func (s *AuthService) HasUsers(ctx context.Context) (bool, error)
@@ -173,7 +176,7 @@ func (s *AuthService) HasUsers(ctx context.Context) (bool, error)
 HasUsers reports whether at least one local user has been configured in the database.
 
 <a name="AuthService.ListUsers"></a>
-### func \(\*AuthService\) [ListUsers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L79>)
+### func \(\*AuthService\) [ListUsers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L118>)
 
 ```go
 func (s *AuthService) ListUsers(ctx context.Context) ([]domain.UserProfile, error)
@@ -182,7 +185,7 @@ func (s *AuthService) ListUsers(ctx context.Context) ([]domain.UserProfile, erro
 ListUsers returns safe public profiles for all local users.
 
 <a name="AuthService.Lock"></a>
-### func \(\*AuthService\) [Lock](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L118>)
+### func \(\*AuthService\) [Lock](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L169>)
 
 ```go
 func (s *AuthService) Lock()
@@ -191,7 +194,7 @@ func (s *AuthService) Lock()
 Lock clears the active user session and wipes the derived vault master key from memory.
 
 <a name="AuthService.Login"></a>
-### func \(\*AuthService\) [Login](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L92>)
+### func \(\*AuthService\) [Login](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L131>)
 
 ```go
 func (s *AuthService) Login(ctx context.Context, username, password string) (domain.UserProfile, error)
@@ -199,8 +202,17 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (dom
 
 Login authenticates a local user, derives their vault master key, and sets the active session.
 
+<a name="AuthService.SetLoginBackoff"></a>
+### func \(\*AuthService\) [SetLoginBackoff](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/auth_service.go#L60>)
+
+```go
+func (s *AuthService) SetLoginBackoff(maxFailures int, baseDelay, maxDelay time.Duration)
+```
+
+SetLoginBackoff customizes the consecutive\-failure threshold and exponential cooldown window for Login.
+
 <a name="HostService"></a>
-## type [HostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L29-L35>)
+## type [HostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L29-L36>)
 
 HostService manages EC2 and Linux host instances and user\-defined groups isolated per authenticated user.
 
@@ -211,16 +223,16 @@ type HostService struct {
 ```
 
 <a name="NewHostService"></a>
-### func [NewHostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L38-L44>)
+### func [NewHostService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L39-L46>)
 
 ```go
-func NewHostService(auth *AuthService, hosts ports.HostRepository, keys ports.KeyRepository, groups ports.HostGroupRepository, tunnels ports.TunnelRepository) *HostService
+func NewHostService(auth *AuthService, hosts ports.HostRepository, keys ports.KeyRepository, groups ports.HostGroupRepository, tunnels ports.TunnelRepository, services ports.ServiceRepository) *HostService
 ```
 
-NewHostService constructs a HostService with active session, host, key, group, and optional tunnel repositories.
+NewHostService constructs a HostService with active session, host, key, group, and optional tunnel and service repositories.
 
 <a name="HostService.CreateGroup"></a>
-### func \(\*HostService\) [CreateGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L199>)
+### func \(\*HostService\) [CreateGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L212>)
 
 ```go
 func (s *HostService) CreateGroup(ctx context.Context, name string) (domain.HostGroup, error)
@@ -229,7 +241,7 @@ func (s *HostService) CreateGroup(ctx context.Context, name string) (domain.Host
 CreateGroup validates and creates a new host group owned by the active user.
 
 <a name="HostService.CreateHost"></a>
-### func \(\*HostService\) [CreateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L55>)
+### func \(\*HostService\) [CreateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L58>)
 
 ```go
 func (s *HostService) CreateHost(ctx context.Context, input SaveHostInput) (domain.HostInstance, error)
@@ -238,7 +250,7 @@ func (s *HostService) CreateHost(ctx context.Context, input SaveHostInput) (doma
 CreateHost validates and persists a new HostInstance owned by the currently authenticated user.
 
 <a name="HostService.DeleteGroup"></a>
-### func \(\*HostService\) [DeleteGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L256>)
+### func \(\*HostService\) [DeleteGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L269>)
 
 ```go
 func (s *HostService) DeleteGroup(ctx context.Context, groupID string) error
@@ -247,16 +259,16 @@ func (s *HostService) DeleteGroup(ctx context.Context, groupID string) error
 DeleteGroup removes a host group owned by the active user; member instances become ungrouped.
 
 <a name="HostService.DeleteHost"></a>
-### func \(\*HostService\) [DeleteHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L156>)
+### func \(\*HostService\) [DeleteHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L159>)
 
 ```go
 func (s *HostService) DeleteHost(ctx context.Context, hostID string) error
 ```
 
-DeleteHost deletes a HostInstance owned by the currently authenticated user unless tunnels reference it.
+DeleteHost deletes a HostInstance owned by the currently authenticated user unless tunnels or private services reference it.
 
 <a name="HostService.GetHost"></a>
-### func \(\*HostService\) [GetHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L99>)
+### func \(\*HostService\) [GetHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L102>)
 
 ```go
 func (s *HostService) GetHost(ctx context.Context, hostID string) (domain.HostInstance, error)
@@ -265,7 +277,7 @@ func (s *HostService) GetHost(ctx context.Context, hostID string) (domain.HostIn
 GetHost retrieves a single HostInstance belonging to the currently authenticated user.
 
 <a name="HostService.ListGroups"></a>
-### func \(\*HostService\) [ListGroups](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L183>)
+### func \(\*HostService\) [ListGroups](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L196>)
 
 ```go
 func (s *HostService) ListGroups(ctx context.Context) ([]domain.HostGroup, error)
@@ -274,7 +286,7 @@ func (s *HostService) ListGroups(ctx context.Context) ([]domain.HostGroup, error
 ListGroups returns all user\-defined host groups belonging to the active user.
 
 <a name="HostService.ListHosts"></a>
-### func \(\*HostService\) [ListHosts](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L85>)
+### func \(\*HostService\) [ListHosts](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L88>)
 
 ```go
 func (s *HostService) ListHosts(ctx context.Context) ([]domain.HostInstance, error)
@@ -283,7 +295,7 @@ func (s *HostService) ListHosts(ctx context.Context) ([]domain.HostInstance, err
 ListHosts returns all HostInstance records belonging to the currently authenticated user.
 
 <a name="HostService.RenameGroup"></a>
-### func \(\*HostService\) [RenameGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L227>)
+### func \(\*HostService\) [RenameGroup](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L240>)
 
 ```go
 func (s *HostService) RenameGroup(ctx context.Context, groupID, name string) (domain.HostGroup, error)
@@ -292,7 +304,7 @@ func (s *HostService) RenameGroup(ctx context.Context, groupID, name string) (do
 RenameGroup updates the name of an existing host group owned by the active user.
 
 <a name="HostService.UpdateHost"></a>
-### func \(\*HostService\) [UpdateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L117>)
+### func \(\*HostService\) [UpdateHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/host_service.go#L120>)
 
 ```go
 func (s *HostService) UpdateHost(ctx context.Context, input SaveHostInput) (domain.HostInstance, error)
@@ -301,7 +313,7 @@ func (s *HostService) UpdateHost(ctx context.Context, input SaveHostInput) (doma
 UpdateHost modifies an existing HostInstance owned by the currently authenticated user.
 
 <a name="ObservabilityService"></a>
-## type [ObservabilityService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L49-L60>)
+## type [ObservabilityService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L53-L65>)
 
 ObservabilityService manages saved private web services and their local loopback SSH tunnels.
 
@@ -312,16 +324,16 @@ type ObservabilityService struct {
 ```
 
 <a name="NewObservabilityService"></a>
-### func [NewObservabilityService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L63-L71>)
+### func [NewObservabilityService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L68-L77>)
 
 ```go
-func NewObservabilityService(auth *AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, services ports.ServiceRepository, vault *VaultService, sshManager ports.SSHSessionManager, sink ServiceEventSink) *ObservabilityService
+func NewObservabilityService(auth *AuthService, hosts ports.HostRepository, knownHosts ports.KnownHostRepository, services ports.ServiceRepository, vault *VaultService, sshManager ports.SSHSessionManager, prober ports.HealthProber, sink ServiceEventSink) *ObservabilityService
 ```
 
 NewObservabilityService constructs an ObservabilityService.
 
 <a name="ObservabilityService.CloseAll"></a>
-### func \(\*ObservabilityService\) [CloseAll](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L421>)
+### func \(\*ObservabilityService\) [CloseAll](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L440>)
 
 ```go
 func (s *ObservabilityService) CloseAll()
@@ -330,7 +342,7 @@ func (s *ObservabilityService) CloseAll()
 CloseAll stops all active tunnels during application shutdown or user vault lock.
 
 <a name="ObservabilityService.CreateService"></a>
-### func \(\*ObservabilityService\) [CreateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L85>)
+### func \(\*ObservabilityService\) [CreateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L92>)
 
 ```go
 func (s *ObservabilityService) CreateService(ctx context.Context, input SaveServiceInput) (domain.PrivateService, error)
@@ -339,7 +351,7 @@ func (s *ObservabilityService) CreateService(ctx context.Context, input SaveServ
 CreateService validates and persists a new PrivateService scoped to the current user.
 
 <a name="ObservabilityService.DeleteService"></a>
-### func \(\*ObservabilityService\) [DeleteService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L177>)
+### func \(\*ObservabilityService\) [DeleteService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L184>)
 
 ```go
 func (s *ObservabilityService) DeleteService(ctx context.Context, serviceID string) error
@@ -348,7 +360,7 @@ func (s *ObservabilityService) DeleteService(ctx context.Context, serviceID stri
 DeleteService removes a stopped private service definition.
 
 <a name="ObservabilityService.ListServices"></a>
-### func \(\*ObservabilityService\) [ListServices](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L112>)
+### func \(\*ObservabilityService\) [ListServices](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L119>)
 
 ```go
 func (s *ObservabilityService) ListServices(ctx context.Context) ([]domain.PrivateService, error)
@@ -357,7 +369,7 @@ func (s *ObservabilityService) ListServices(ctx context.Context) ([]domain.Priva
 ListServices returns all saved services owned by the active user.
 
 <a name="ObservabilityService.ListServicesByHost"></a>
-### func \(\*ObservabilityService\) [ListServicesByHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L125>)
+### func \(\*ObservabilityService\) [ListServicesByHost](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L132>)
 
 ```go
 func (s *ObservabilityService) ListServicesByHost(ctx context.Context, hostID string) ([]domain.PrivateService, error)
@@ -366,7 +378,7 @@ func (s *ObservabilityService) ListServicesByHost(ctx context.Context, hostID st
 ListServicesByHost returns saved services for a specific host owned by the active user.
 
 <a name="ObservabilityService.ListStatuses"></a>
-### func \(\*ObservabilityService\) [ListStatuses](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L402>)
+### func \(\*ObservabilityService\) [ListStatuses](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L421>)
 
 ```go
 func (s *ObservabilityService) ListStatuses() ([]domain.ServiceRuntimeStatus, error)
@@ -375,16 +387,16 @@ func (s *ObservabilityService) ListStatuses() ([]domain.ServiceRuntimeStatus, er
 ListStatuses returns runtime status snapshots for all active services owned by current user.
 
 <a name="ObservabilityService.ProbeServiceHealth"></a>
-### func \(\*ObservabilityService\) [ProbeServiceHealth](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L319>)
+### func \(\*ObservabilityService\) [ProbeServiceHealth](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L329>)
 
 ```go
-func (s *ObservabilityService) ProbeServiceHealth(ctx context.Context, serviceID string) domain.ServiceRuntimeStatus
+func (s *ObservabilityService) ProbeServiceHealth(ctx context.Context, serviceID string) (domain.ServiceRuntimeStatus, error)
 ```
 
-ProbeServiceHealth sends an HTTP GET probe to the service's health path through the active tunnel.
+ProbeServiceHealth sends an HTTP GET probe to an owned service's health path through its active tunnel.
 
 <a name="ObservabilityService.StartService"></a>
-### func \(\*ObservabilityService\) [StartService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L198-L203>)
+### func \(\*ObservabilityService\) [StartService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L205-L210>)
 
 ```go
 func (s *ObservabilityService) StartService(ctx context.Context, serviceID string, passwordFallback string, tofuConfirm TOFUTrustPromptFunc) (domain.ServiceRuntimeStatus, error)
@@ -393,7 +405,7 @@ func (s *ObservabilityService) StartService(ctx context.Context, serviceID strin
 StartService starts the local loopback SSH tunnel for the service, checks its health, and emits status.
 
 <a name="ObservabilityService.StopService"></a>
-### func \(\*ObservabilityService\) [StopService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L292>)
+### func \(\*ObservabilityService\) [StopService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L302>)
 
 ```go
 func (s *ObservabilityService) StopService(serviceID string) error
@@ -402,7 +414,7 @@ func (s *ObservabilityService) StopService(serviceID string) error
 StopService closes the local tunnel for the given service.
 
 <a name="ObservabilityService.UpdateService"></a>
-### func \(\*ObservabilityService\) [UpdateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L138>)
+### func \(\*ObservabilityService\) [UpdateService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L145>)
 
 ```go
 func (s *ObservabilityService) UpdateService(ctx context.Context, input SaveServiceInput) (domain.PrivateService, error)
@@ -430,24 +442,25 @@ type SaveHostInput struct {
 ```
 
 <a name="SaveServiceInput"></a>
-## type [SaveServiceInput](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L21-L34>)
+## type [SaveServiceInput](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L24-L38>)
 
 SaveServiceInput captures fields required to create or update a private web service.
 
 ```go
 type SaveServiceInput struct {
-    ID         string                 `json:"id,omitempty"`
-    HostID     string                 `json:"hostId"`
-    Name       string                 `json:"name"`
-    Preset     domain.ServicePreset   `json:"preset"`
-    Protocol   domain.ServiceProtocol `json:"protocol"`
-    RemoteHost string                 `json:"remoteHost"`
-    RemotePort int                    `json:"remotePort"`
-    BasePath   string                 `json:"basePath"`
-    LocalPort  int                    `json:"localPort"`
-    HealthPath string                 `json:"healthPath"`
-    OpenMode   domain.ServiceOpenMode `json:"openMode"`
-    Notes      string                 `json:"notes"`
+    ID               string                 `json:"id,omitempty"`
+    HostID           string                 `json:"hostId"`
+    Name             string                 `json:"name"`
+    Preset           domain.ServicePreset   `json:"preset"`
+    Protocol         domain.ServiceProtocol `json:"protocol"`
+    RemoteHost       string                 `json:"remoteHost"`
+    RemotePort       int                    `json:"remotePort"`
+    BasePath         string                 `json:"basePath"`
+    LocalPort        int                    `json:"localPort"`
+    HealthPath       string                 `json:"healthPath"`
+    OpenMode         domain.ServiceOpenMode `json:"openMode"`
+    AllowInsecureTLS bool                   `json:"allowInsecureTls"`
+    Notes            string                 `json:"notes"`
 }
 ```
 
@@ -488,7 +501,7 @@ type SaveTunnelInput struct {
 ```
 
 <a name="ServiceEventSink"></a>
-## type [ServiceEventSink](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L37-L39>)
+## type [ServiceEventSink](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/observability_service.go#L41-L43>)
 
 ServiceEventSink notifies the UI about runtime changes to a service's tunnel and health status.
 
@@ -695,7 +708,7 @@ type TerminalEventSink interface {
 ```
 
 <a name="TransferEventSink"></a>
-## type [TransferEventSink](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L19-L21>)
+## type [TransferEventSink](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L23-L25>)
 
 TransferEventSink receives throttled SFTP transfer progress and completion notifications.
 
@@ -706,7 +719,7 @@ type TransferEventSink interface {
 ```
 
 <a name="TransferService"></a>
-## type [TransferService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L29-L37>)
+## type [TransferService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L34-L43>)
 
 TransferService manages local Windows browsing, remote SFTP browsing, and cancelable file transfers.
 
@@ -717,7 +730,7 @@ type TransferService struct {
 ```
 
 <a name="NewTransferService"></a>
-### func [NewTransferService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L40-L45>)
+### func [NewTransferService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L46-L51>)
 
 ```go
 func NewTransferService(auth *AuthService, sessions *SessionService, localFS ports.LocalFileSystem, sink TransferEventSink) *TransferService
@@ -726,7 +739,7 @@ func NewTransferService(auth *AuthService, sessions *SessionService, localFS por
 NewTransferService constructs a TransferService wired to auth, active sessions, local FS, and event sink.
 
 <a name="TransferService.CancelTransfer"></a>
-### func \(\*TransferService\) [CancelTransfer](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L197>)
+### func \(\*TransferService\) [CancelTransfer](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L220>)
 
 ```go
 func (s *TransferService) CancelTransfer(transferID string) error
@@ -735,16 +748,16 @@ func (s *TransferService) CancelTransfer(transferID string) error
 CancelTransfer cancels an active transfer task owned by the authenticated user.
 
 <a name="TransferService.CloseAll"></a>
-### func \(\*TransferService\) [CloseAll](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L234>)
+### func \(\*TransferService\) [CloseAll](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L263>)
 
 ```go
 func (s *TransferService) CloseAll()
 ```
 
-CloseAll cancels all active file transfers \(typically on vault lock or shutdown\).
+CloseAll cancels all active file transfers and clears finished transfer history from memory.
 
 <a name="TransferService.DeleteLocal"></a>
-### func \(\*TransferService\) [DeleteLocal](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L114>)
+### func \(\*TransferService\) [DeleteLocal](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L132>)
 
 ```go
 func (s *TransferService) DeleteLocal(ctx context.Context, localPath string) error
@@ -753,7 +766,7 @@ func (s *TransferService) DeleteLocal(ctx context.Context, localPath string) err
 DeleteLocal removes a local file or directory.
 
 <a name="TransferService.DeleteRemote"></a>
-### func \(\*TransferService\) [DeleteRemote](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L175>)
+### func \(\*TransferService\) [DeleteRemote](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L193>)
 
 ```go
 func (s *TransferService) DeleteRemote(ctx context.Context, sessionID, remotePath string, recursive bool) error
@@ -762,7 +775,7 @@ func (s *TransferService) DeleteRemote(ctx context.Context, sessionID, remotePat
 DeleteRemote deletes a remote file or directory over SFTP.
 
 <a name="TransferService.ListLocalDir"></a>
-### func \(\*TransferService\) [ListLocalDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L80>)
+### func \(\*TransferService\) [ListLocalDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L98>)
 
 ```go
 func (s *TransferService) ListLocalDir(ctx context.Context, localPath string) ([]domain.FileEntry, error)
@@ -771,7 +784,7 @@ func (s *TransferService) ListLocalDir(ctx context.Context, localPath string) ([
 ListLocalDir lists files and subdirectories at localPath for the active user.
 
 <a name="TransferService.ListLocalRoots"></a>
-### func \(\*TransferService\) [ListLocalRoots](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L68>)
+### func \(\*TransferService\) [ListLocalRoots](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L86>)
 
 ```go
 func (s *TransferService) ListLocalRoots(ctx context.Context) ([]string, error)
@@ -780,7 +793,7 @@ func (s *TransferService) ListLocalRoots(ctx context.Context) ([]string, error)
 ListLocalRoots lists available local filesystem drive roots \(e.g. C:\\, D:\\\) for the active user.
 
 <a name="TransferService.ListRemoteDir"></a>
-### func \(\*TransferService\) [ListRemoteDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L138>)
+### func \(\*TransferService\) [ListRemoteDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L156>)
 
 ```go
 func (s *TransferService) ListRemoteDir(ctx context.Context, sessionID, remotePath string) ([]domain.FileEntry, error)
@@ -789,16 +802,16 @@ func (s *TransferService) ListRemoteDir(ctx context.Context, sessionID, remotePa
 ListRemoteDir lists files and directories on the remote SFTP host for an owned session.
 
 <a name="TransferService.ListTransfers"></a>
-### func \(\*TransferService\) [ListTransfers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L215>)
+### func \(\*TransferService\) [ListTransfers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L238>)
 
 ```go
 func (s *TransferService) ListTransfers() ([]domain.TransferTask, error)
 ```
 
-ListTransfers returns all tracked transfer tasks belonging to the authenticated user.
+ListTransfers returns tracked transfer tasks belonging to the authenticated user sorted by start time.
 
 <a name="TransferService.LocalHomeDir"></a>
-### func \(\*TransferService\) [LocalHomeDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L56>)
+### func \(\*TransferService\) [LocalHomeDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L74>)
 
 ```go
 func (s *TransferService) LocalHomeDir() (string, error)
@@ -807,7 +820,7 @@ func (s *TransferService) LocalHomeDir() (string, error)
 LocalHomeDir returns the local user's home directory when authenticated.
 
 <a name="TransferService.MakeLocalDir"></a>
-### func \(\*TransferService\) [MakeLocalDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L92>)
+### func \(\*TransferService\) [MakeLocalDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L110>)
 
 ```go
 func (s *TransferService) MakeLocalDir(ctx context.Context, localPath string) error
@@ -816,7 +829,7 @@ func (s *TransferService) MakeLocalDir(ctx context.Context, localPath string) er
 MakeLocalDir creates a local directory at localPath.
 
 <a name="TransferService.MakeRemoteDir"></a>
-### func \(\*TransferService\) [MakeRemoteDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L151>)
+### func \(\*TransferService\) [MakeRemoteDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L169>)
 
 ```go
 func (s *TransferService) MakeRemoteDir(ctx context.Context, sessionID, remotePath string) error
@@ -825,7 +838,7 @@ func (s *TransferService) MakeRemoteDir(ctx context.Context, sessionID, remotePa
 MakeRemoteDir creates a directory on the remote SFTP host.
 
 <a name="TransferService.RemoteWorkingDir"></a>
-### func \(\*TransferService\) [RemoteWorkingDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L125>)
+### func \(\*TransferService\) [RemoteWorkingDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L143>)
 
 ```go
 func (s *TransferService) RemoteWorkingDir(ctx context.Context, sessionID string) (string, error)
@@ -834,7 +847,7 @@ func (s *TransferService) RemoteWorkingDir(ctx context.Context, sessionID string
 RemoteWorkingDir returns the initial remote directory of the session's SFTP channel.
 
 <a name="TransferService.RenameLocal"></a>
-### func \(\*TransferService\) [RenameLocal](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L103>)
+### func \(\*TransferService\) [RenameLocal](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L121>)
 
 ```go
 func (s *TransferService) RenameLocal(ctx context.Context, oldPath, newPath string) error
@@ -843,7 +856,7 @@ func (s *TransferService) RenameLocal(ctx context.Context, oldPath, newPath stri
 RenameLocal renames or moves a local file or directory.
 
 <a name="TransferService.RenameRemote"></a>
-### func \(\*TransferService\) [RenameRemote](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L163>)
+### func \(\*TransferService\) [RenameRemote](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L181>)
 
 ```go
 func (s *TransferService) RenameRemote(ctx context.Context, sessionID, oldPath, newPath string) error
@@ -851,8 +864,17 @@ func (s *TransferService) RenameRemote(ctx context.Context, sessionID, oldPath, 
 
 RenameRemote renames or moves a remote file or directory over SFTP.
 
+<a name="TransferService.SetMaxHistory"></a>
+### func \(\*TransferService\) [SetMaxHistory](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L63>)
+
+```go
+func (s *TransferService) SetMaxHistory(limit int)
+```
+
+SetMaxHistory overrides the maximum number of finished transfer tasks retained in memory.
+
 <a name="TransferService.StartDownload"></a>
-### func \(\*TransferService\) [StartDownload](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L192>)
+### func \(\*TransferService\) [StartDownload](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L215>)
 
 ```go
 func (s *TransferService) StartDownload(sessionID, remotePath, localPath string) (domain.TransferTask, error)
@@ -861,13 +883,22 @@ func (s *TransferService) StartDownload(sessionID, remotePath, localPath string)
 StartDownload queues and executes an asynchronous cancelable file download from remotePath to localPath.
 
 <a name="TransferService.StartUpload"></a>
-### func \(\*TransferService\) [StartUpload](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L187>)
+### func \(\*TransferService\) [StartUpload](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L205>)
 
 ```go
 func (s *TransferService) StartUpload(sessionID, localPath, remotePath string) (domain.TransferTask, error)
 ```
 
 StartUpload queues and executes an asynchronous cancelable file upload from localPath to remotePath.
+
+<a name="TransferService.StartUploadDirectory"></a>
+### func \(\*TransferService\) [StartUploadDirectory](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/transfer_service.go#L210>)
+
+```go
+func (s *TransferService) StartUploadDirectory(sessionID, localDirPath, remoteTargetDir string) (domain.TransferTask, error)
+```
+
+StartUploadDirectory queues and executes an asynchronous cancelable recursive directory upload from localDirPath to remoteTargetDir.
 
 <a name="TunnelEventSink"></a>
 ## type [TunnelEventSink](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/services/tunnel_service.go#L34-L36>)

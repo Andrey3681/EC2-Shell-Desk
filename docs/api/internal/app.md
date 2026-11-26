@@ -55,7 +55,7 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
   - [func \(h \*ObservabilityHandler\) ListServices\(\) \(\[\]domain.PrivateService, error\)](<#ObservabilityHandler.ListServices>)
   - [func \(h \*ObservabilityHandler\) ListServicesByHost\(hostID string\) \(\[\]domain.PrivateService, error\)](<#ObservabilityHandler.ListServicesByHost>)
   - [func \(h \*ObservabilityHandler\) OpenService\(serviceID, passwordFallback string\) \(domain.ServiceRuntimeStatus, error\)](<#ObservabilityHandler.OpenService>)
-  - [func \(h \*ObservabilityHandler\) ProbeServiceHealth\(serviceID string\) domain.ServiceRuntimeStatus](<#ObservabilityHandler.ProbeServiceHealth>)
+  - [func \(h \*ObservabilityHandler\) ProbeServiceHealth\(serviceID string\) \(domain.ServiceRuntimeStatus, error\)](<#ObservabilityHandler.ProbeServiceHealth>)
   - [func \(h \*ObservabilityHandler\) StartService\(serviceID, passwordFallback string\) \(domain.ServiceRuntimeStatus, error\)](<#ObservabilityHandler.StartService>)
   - [func \(h \*ObservabilityHandler\) StopService\(serviceID string\) error](<#ObservabilityHandler.StopService>)
   - [func \(h \*ObservabilityHandler\) UpdateService\(input services.SaveServiceInput\) \(domain.PrivateService, error\)](<#ObservabilityHandler.UpdateService>)
@@ -73,11 +73,13 @@ Package app exposes Wails v2 controller bindings and bridges frontend IPC calls 
   - [func \(h \*SFTPHandler\) MakeRemoteDir\(sessionID, remotePath string\) error](<#SFTPHandler.MakeRemoteDir>)
   - [func \(h \*SFTPHandler\) PickLocalDirectory\(\) \(string, error\)](<#SFTPHandler.PickLocalDirectory>)
   - [func \(h \*SFTPHandler\) PickLocalFilesToUpload\(\) \(\[\]string, error\)](<#SFTPHandler.PickLocalFilesToUpload>)
+  - [func \(h \*SFTPHandler\) PickLocalFolderToUpload\(\) \(string, error\)](<#SFTPHandler.PickLocalFolderToUpload>)
   - [func \(h \*SFTPHandler\) RemoteWorkingDir\(sessionID string\) \(string, error\)](<#SFTPHandler.RemoteWorkingDir>)
   - [func \(h \*SFTPHandler\) RenameLocal\(oldPath, newPath string\) error](<#SFTPHandler.RenameLocal>)
   - [func \(h \*SFTPHandler\) RenameRemote\(sessionID, oldPath, newPath string\) error](<#SFTPHandler.RenameRemote>)
   - [func \(h \*SFTPHandler\) StartDownload\(sessionID, remoteFilePath, localDirPath string\) \(domain.TransferTask, error\)](<#SFTPHandler.StartDownload>)
   - [func \(h \*SFTPHandler\) StartUpload\(sessionID, localFilePath, remoteDirPath string\) \(domain.TransferTask, error\)](<#SFTPHandler.StartUpload>)
+  - [func \(h \*SFTPHandler\) StartUploadDirectory\(sessionID, localDirPath, remoteDirPath string\) \(domain.TransferTask, error\)](<#SFTPHandler.StartUploadDirectory>)
 - [type SnippetHandler](<#SnippetHandler>)
   - [func NewSnippetHandler\(bridge \*EventBridge, snippets \*services.SnippetService\) \*SnippetHandler](<#NewSnippetHandler>)
   - [func \(h \*SnippetHandler\) BroadcastSnippet\(sessionIDs \[\]string, snippetID string\) error](<#SnippetHandler.BroadcastSnippet>)
@@ -271,7 +273,7 @@ func (b *EventBridge) OnTunnelStatusChanged(status domain.TunnelRuntimeStatus)
 OnTunnelStatusChanged emits live SSH tunnel state and traffic updates to the frontend.
 
 <a name="EventBridge.RequestTOFUTrust"></a>
-### func \(\*EventBridge\) [RequestTOFUTrust](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L127>)
+### func \(\*EventBridge\) [RequestTOFUTrust](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L129>)
 
 ```go
 func (b *EventBridge) RequestTOFUTrust(ctx context.Context, challenge ports.HostKeyChallenge) (bool, error)
@@ -280,7 +282,7 @@ func (b *EventBridge) RequestTOFUTrust(ctx context.Context, challenge ports.Host
 RequestTOFUTrust emits a host key fingerprint prompt to the UI and waits for the user's decision.
 
 <a name="EventBridge.ResolveTOFU"></a>
-### func \(\*EventBridge\) [ResolveTOFU](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L170>)
+### func \(\*EventBridge\) [ResolveTOFU](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/events.go#L172>)
 
 ```go
 func (b *EventBridge) ResolveTOFU(requestID string, trusted bool) error
@@ -410,7 +412,7 @@ func NewKeyHandler(bridge *EventBridge, vault *services.VaultService) *KeyHandle
 NewKeyHandler constructs a KeyHandler wired to VaultService.
 
 <a name="KeyHandler.DeleteKey"></a>
-### func \(\*KeyHandler\) [DeleteKey](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/key_handler.go#L83>)
+### func \(\*KeyHandler\) [DeleteKey](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/key_handler.go#L84>)
 
 ```go
 func (h *KeyHandler) DeleteKey(keyID string) error
@@ -419,7 +421,7 @@ func (h *KeyHandler) DeleteKey(keyID string) error
 DeleteKey deletes an unreferenced SSH key owned by the active user.
 
 <a name="KeyHandler.ImportKeyContent"></a>
-### func \(\*KeyHandler\) [ImportKeyContent](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/key_handler.go#L64>)
+### func \(\*KeyHandler\) [ImportKeyContent](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/key_handler.go#L65>)
 
 ```go
 func (h *KeyHandler) ImportKeyContent(name, rawPEM, passphrase string) (domain.SSHKeySummary, error)
@@ -437,7 +439,7 @@ func (h *KeyHandler) ImportKeyFromFile(name, filePath, passphrase string) (domai
 ImportKeyFromFile reads an SSH key from disk, encrypts it into the active user's vault, and wipes memory buffers.
 
 <a name="KeyHandler.ListKeys"></a>
-### func \(\*KeyHandler\) [ListKeys](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/key_handler.go#L78>)
+### func \(\*KeyHandler\) [ListKeys](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/key_handler.go#L79>)
 
 ```go
 func (h *KeyHandler) ListKeys() ([]domain.SSHKeySummary, error)
@@ -532,10 +534,10 @@ OpenService ensures the service tunnel is active and launches it in the system b
 ### func \(\*ObservabilityHandler\) [ProbeServiceHealth](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L67>)
 
 ```go
-func (h *ObservabilityHandler) ProbeServiceHealth(serviceID string) domain.ServiceRuntimeStatus
+func (h *ObservabilityHandler) ProbeServiceHealth(serviceID string) (domain.ServiceRuntimeStatus, error)
 ```
 
-ProbeServiceHealth runs an immediate HTTP probe against the service.
+ProbeServiceHealth runs an immediate HTTP probe against an owned service.
 
 <a name="ObservabilityHandler.StartService"></a>
 ### func \(\*ObservabilityHandler\) [StartService](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/observability_handler.go#L52>)
@@ -585,7 +587,7 @@ func NewSFTPHandler(bridge *EventBridge, transfers *services.TransferService) *S
 NewSFTPHandler constructs an SFTPHandler wired to TransferService.
 
 <a name="SFTPHandler.CancelTransfer"></a>
-### func \(\*SFTPHandler\) [CancelTransfer](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L118>)
+### func \(\*SFTPHandler\) [CancelTransfer](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L135>)
 
 ```go
 func (h *SFTPHandler) CancelTransfer(transferID string) error
@@ -603,7 +605,7 @@ func (h *SFTPHandler) DeleteLocal(localPath string) error
 DeleteLocal deletes a local file or directory.
 
 <a name="SFTPHandler.DeleteRemote"></a>
-### func \(\*SFTPHandler\) [DeleteRemote](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L101>)
+### func \(\*SFTPHandler\) [DeleteRemote](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L112>)
 
 ```go
 func (h *SFTPHandler) DeleteRemote(sessionID, remotePath string, recursive bool) error
@@ -630,7 +632,7 @@ func (h *SFTPHandler) ListLocalRoots() ([]string, error)
 ListLocalRoots returns mounted local drive roots \(e.g. C:\\, D:\\\).
 
 <a name="SFTPHandler.ListRemoteDir"></a>
-### func \(\*SFTPHandler\) [ListRemoteDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L86>)
+### func \(\*SFTPHandler\) [ListRemoteDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L97>)
 
 ```go
 func (h *SFTPHandler) ListRemoteDir(sessionID, remotePath string) ([]domain.FileEntry, error)
@@ -639,7 +641,7 @@ func (h *SFTPHandler) ListRemoteDir(sessionID, remotePath string) ([]domain.File
 ListRemoteDir lists remote files and directories over SFTP.
 
 <a name="SFTPHandler.ListTransfers"></a>
-### func \(\*SFTPHandler\) [ListTransfers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L123>)
+### func \(\*SFTPHandler\) [ListTransfers](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L140>)
 
 ```go
 func (h *SFTPHandler) ListTransfers() ([]domain.TransferTask, error)
@@ -666,7 +668,7 @@ func (h *SFTPHandler) MakeLocalDir(localPath string) error
 MakeLocalDir creates a directory at localPath.
 
 <a name="SFTPHandler.MakeRemoteDir"></a>
-### func \(\*SFTPHandler\) [MakeRemoteDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L91>)
+### func \(\*SFTPHandler\) [MakeRemoteDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L102>)
 
 ```go
 func (h *SFTPHandler) MakeRemoteDir(sessionID, remotePath string) error
@@ -692,8 +694,17 @@ func (h *SFTPHandler) PickLocalFilesToUpload() ([]string, error)
 
 PickLocalFilesToUpload opens a native Windows multi\-file selection dialog for SFTP upload.
 
+<a name="SFTPHandler.PickLocalFolderToUpload"></a>
+### func \(\*SFTPHandler\) [PickLocalFolderToUpload](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L81>)
+
+```go
+func (h *SFTPHandler) PickLocalFolderToUpload() (string, error)
+```
+
+PickLocalFolderToUpload opens a native Windows directory picker for recursive SFTP folder upload.
+
 <a name="SFTPHandler.RemoteWorkingDir"></a>
-### func \(\*SFTPHandler\) [RemoteWorkingDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L81>)
+### func \(\*SFTPHandler\) [RemoteWorkingDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L92>)
 
 ```go
 func (h *SFTPHandler) RemoteWorkingDir(sessionID string) (string, error)
@@ -711,7 +722,7 @@ func (h *SFTPHandler) RenameLocal(oldPath, newPath string) error
 RenameLocal renames or moves a local file or directory.
 
 <a name="SFTPHandler.RenameRemote"></a>
-### func \(\*SFTPHandler\) [RenameRemote](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L96>)
+### func \(\*SFTPHandler\) [RenameRemote](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L107>)
 
 ```go
 func (h *SFTPHandler) RenameRemote(sessionID, oldPath, newPath string) error
@@ -720,7 +731,7 @@ func (h *SFTPHandler) RenameRemote(sessionID, oldPath, newPath string) error
 RenameRemote renames or moves a remote file or directory over SFTP.
 
 <a name="SFTPHandler.StartDownload"></a>
-### func \(\*SFTPHandler\) [StartDownload](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L112>)
+### func \(\*SFTPHandler\) [StartDownload](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L129>)
 
 ```go
 func (h *SFTPHandler) StartDownload(sessionID, remoteFilePath, localDirPath string) (domain.TransferTask, error)
@@ -729,13 +740,22 @@ func (h *SFTPHandler) StartDownload(sessionID, remoteFilePath, localDirPath stri
 StartDownload queues an SFTP download of remoteFilePath into localDirPath.
 
 <a name="SFTPHandler.StartUpload"></a>
-### func \(\*SFTPHandler\) [StartUpload](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L106>)
+### func \(\*SFTPHandler\) [StartUpload](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L117>)
 
 ```go
 func (h *SFTPHandler) StartUpload(sessionID, localFilePath, remoteDirPath string) (domain.TransferTask, error)
 ```
 
 StartUpload queues an SFTP upload of localFilePath into remoteDirPath.
+
+<a name="SFTPHandler.StartUploadDirectory"></a>
+### func \(\*SFTPHandler\) [StartUploadDirectory](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/sftp_handler.go#L123>)
+
+```go
+func (h *SFTPHandler) StartUploadDirectory(sessionID, localDirPath, remoteDirPath string) (domain.TransferTask, error)
+```
+
+StartUploadDirectory queues a recursive SFTP upload of localDirPath into remoteDirPath.
 
 <a name="SnippetHandler"></a>
 ## type [SnippetHandler](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/app/snippet_handler.go#L9-L12>)

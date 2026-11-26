@@ -16,9 +16,11 @@ Package sftpclient implements the SFTP client port with streaming file transfers
   - [func \(c \*Client\) Download\(ctx context.Context, remotePath, localPath string, onProgress ports.TransferProgressFunc\) error](<#Client.Download>)
   - [func \(c \*Client\) ListDir\(ctx context.Context, remotePath string\) \(\[\]domain.FileEntry, error\)](<#Client.ListDir>)
   - [func \(c \*Client\) Mkdir\(ctx context.Context, remotePath string\) error](<#Client.Mkdir>)
+  - [func \(c \*Client\) MkdirAll\(ctx context.Context, remotePath string\) error](<#Client.MkdirAll>)
   - [func \(c \*Client\) Remove\(ctx context.Context, remotePath string, recursive bool\) error](<#Client.Remove>)
   - [func \(c \*Client\) Rename\(ctx context.Context, oldPath, newPath string\) error](<#Client.Rename>)
   - [func \(c \*Client\) Upload\(ctx context.Context, localPath, remotePath string, onProgress ports.TransferProgressFunc\) error](<#Client.Upload>)
+  - [func \(c \*Client\) UploadDir\(ctx context.Context, localDirPath, remoteTargetDir string, onProgress ports.TransferProgressFunc\) error](<#Client.UploadDir>)
   - [func \(c \*Client\) WorkingDir\(ctx context.Context\) \(string, error\)](<#Client.WorkingDir>)
 
 
@@ -43,7 +45,7 @@ type Client struct {
 ```
 
 <a name="Client.Close"></a>
-### func \(\*Client\) [Close](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L278>)
+### func \(\*Client\) [Close](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L436>)
 
 ```go
 func (c *Client) Close() error
@@ -52,7 +54,7 @@ func (c *Client) Close() error
 Close closes the underlying SFTP client session.
 
 <a name="Client.Download"></a>
-### func \(\*Client\) [Download](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L132>)
+### func \(\*Client\) [Download](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L274>)
 
 ```go
 func (c *Client) Download(ctx context.Context, remotePath, localPath string, onProgress ports.TransferProgressFunc) error
@@ -70,7 +72,7 @@ func (c *Client) ListDir(ctx context.Context, remotePath string) ([]domain.FileE
 ListDir lists files and subdirectories at remotePath sorted directories\-first then alphabetically.
 
 <a name="Client.Mkdir"></a>
-### func \(\*Client\) [Mkdir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L185>)
+### func \(\*Client\) [Mkdir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L328>)
 
 ```go
 func (c *Client) Mkdir(ctx context.Context, remotePath string) error
@@ -78,8 +80,17 @@ func (c *Client) Mkdir(ctx context.Context, remotePath string) error
 
 Mkdir creates a directory at remotePath.
 
+<a name="Client.MkdirAll"></a>
+### func \(\*Client\) [MkdirAll](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L343>)
+
+```go
+func (c *Client) MkdirAll(ctx context.Context, remotePath string) error
+```
+
+MkdirAll creates a directory at remotePath along with any necessary parents.
+
 <a name="Client.Remove"></a>
-### func \(\*Client\) [Remove](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L219>)
+### func \(\*Client\) [Remove](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L377>)
 
 ```go
 func (c *Client) Remove(ctx context.Context, remotePath string, recursive bool) error
@@ -88,7 +99,7 @@ func (c *Client) Remove(ctx context.Context, remotePath string, recursive bool) 
 Remove deletes a remote file or directory \(recursively when recursive is true\).
 
 <a name="Client.Rename"></a>
-### func \(\*Client\) [Rename](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L200>)
+### func \(\*Client\) [Rename](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L358>)
 
 ```go
 func (c *Client) Rename(ctx context.Context, oldPath, newPath string) error
@@ -104,6 +115,15 @@ func (c *Client) Upload(ctx context.Context, localPath, remotePath string, onPro
 ```
 
 Upload streams a local Windows file to remotePath while reporting progress and honoring cancellation.
+
+<a name="Client.UploadDir"></a>
+### func \(\*Client\) [UploadDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L139>)
+
+```go
+func (c *Client) UploadDir(ctx context.Context, localDirPath, remoteTargetDir string, onProgress ports.TransferProgressFunc) error
+```
+
+UploadDir recursively uploads a local directory and all its nested files to remoteTargetDir while reporting aggregated byte progress.
 
 <a name="Client.WorkingDir"></a>
 ### func \(\*Client\) [WorkingDir](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sftpclient/client.go#L41>)

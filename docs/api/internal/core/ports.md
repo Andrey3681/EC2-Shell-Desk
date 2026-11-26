@@ -10,6 +10,9 @@ Package ports defines hexagonal port interfaces for persistence, cryptography, S
 
 ## Index
 
+- [type HealthProbeRequest](<#HealthProbeRequest>)
+- [type HealthProbeResult](<#HealthProbeResult>)
+- [type HealthProber](<#HealthProber>)
 - [type HostGroupRepository](<#HostGroupRepository>)
 - [type HostKeyChallenge](<#HostKeyChallenge>)
 - [type HostKeyVerifier](<#HostKeyVerifier>)
@@ -33,6 +36,41 @@ Package ports defines hexagonal port interfaces for persistence, cryptography, S
 - [type TunnelRepository](<#TunnelRepository>)
 - [type UserRepository](<#UserRepository>)
 
+
+<a name="HealthProbeRequest"></a>
+## type [HealthProbeRequest](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/health_prober.go#L6-L9>)
+
+HealthProbeRequest configures a single outbound HTTP/HTTPS health probe against a tunneled service.
+
+```go
+type HealthProbeRequest struct {
+    URL              string
+    AllowInsecureTLS bool
+}
+```
+
+<a name="HealthProbeResult"></a>
+## type [HealthProbeResult](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/health_prober.go#L12-L15>)
+
+HealthProbeResult carries the HTTP status code and round\-trip latency of a completed health probe.
+
+```go
+type HealthProbeResult struct {
+    HTTPStatus int
+    LatencyMs  int64
+}
+```
+
+<a name="HealthProber"></a>
+## type [HealthProber](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/health_prober.go#L18-L20>)
+
+HealthProber performs outbound HTTP/HTTPS health checks for private observability services.
+
+```go
+type HealthProber interface {
+    Probe(ctx context.Context, req HealthProbeRequest) (HealthProbeResult, error)
+}
+```
 
 <a name="HostGroupRepository"></a>
 ## type [HostGroupRepository](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/repository.go#L57-L63>)
@@ -203,7 +241,7 @@ type PasswordHasher interface {
 ```
 
 <a name="SFTPClient"></a>
-## type [SFTPClient](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/sftp_engine.go#L13-L22>)
+## type [SFTPClient](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/core/ports/sftp_engine.go#L13-L24>)
 
 SFTPClient defines remote filesystem and cancelable file transfer operations over SFTP.
 
@@ -212,8 +250,10 @@ type SFTPClient interface {
     WorkingDir(ctx context.Context) (string, error)
     ListDir(ctx context.Context, remotePath string) ([]domain.FileEntry, error)
     Upload(ctx context.Context, localPath, remotePath string, onProgress TransferProgressFunc) error
+    UploadDir(ctx context.Context, localDirPath, remoteTargetDir string, onProgress TransferProgressFunc) error
     Download(ctx context.Context, remotePath, localPath string, onProgress TransferProgressFunc) error
     Mkdir(ctx context.Context, remotePath string) error
+    MkdirAll(ctx context.Context, remotePath string) error
     Rename(ctx context.Context, oldPath, newPath string) error
     Remove(ctx context.Context, remotePath string, recursive bool) error
     Close() error

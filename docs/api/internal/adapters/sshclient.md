@@ -21,7 +21,7 @@ Package sshclient implements the SSH session manager port with key parsing, TOFU
 
 
 <a name="Manager"></a>
-## type [Manager](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/manager.go#L53-L57>)
+## type [Manager](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/manager.go#L53-L60>)
 
 Manager implements ports.SSHSessionManager using golang.org/x/crypto/ssh.
 
@@ -32,7 +32,7 @@ type Manager struct {
 ```
 
 <a name="NewManager"></a>
-### func [NewManager](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/manager.go#L60>)
+### func [NewManager](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/manager.go#L63>)
 
 ```go
 func NewManager(sftpOpener SFTPOpener, opts ...Option) *Manager
@@ -41,7 +41,7 @@ func NewManager(sftpOpener SFTPOpener, opts ...Option) *Manager
 NewManager constructs an SSH session manager with optional SFTP opener and timing options.
 
 <a name="Manager.ConnectPTY"></a>
-### func \(\*Manager\) [ConnectPTY](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/manager.go#L75>)
+### func \(\*Manager\) [ConnectPTY](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/manager.go#L79>)
 
 ```go
 func (m *Manager) ConnectPTY(ctx context.Context, req ports.SSHConnectRequest) (ports.PTYSession, error)
@@ -50,13 +50,13 @@ func (m *Manager) ConnectPTY(ctx context.Context, req ports.SSHConnectRequest) (
 ConnectPTY establishes an authenticated SSH connection with TOFU verification and starts an interactive PTY shell.
 
 <a name="Manager.StartLocalForward"></a>
-### func \(\*Manager\) [StartLocalForward](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/tunnel.go#L24>)
+### func \(\*Manager\) [StartLocalForward](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/tunnel.go#L53>)
 
 ```go
 func (m *Manager) StartLocalForward(ctx context.Context, req ports.TunnelForwardRequest) (ports.TunnelHandle, error)
 ```
 
-StartLocalForward establishes an SSH bastion connection and listens on a local TCP port, forwarding each connection to the target remote endpoint over the SSH tunnel.
+StartLocalForward establishes \(or reuses a pooled\) SSH bastion connection and listens on a local TCP port, forwarding each connection to the target remote endpoint over the SSH tunnel.
 
 <a name="Option"></a>
 ## type [Option](<https://github.com/Andrey3681/EC2-Shell-Desk/blob/main/internal/adapters/sshclient/manager.go#L32>)
