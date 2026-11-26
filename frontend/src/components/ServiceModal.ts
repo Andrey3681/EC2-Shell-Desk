@@ -109,6 +109,7 @@ export function openServiceModal(
   let localPort = existing?.localPort ?? 0;
   let healthPath = existing?.healthPath ?? SERVICE_PRESETS[preset]?.healthPath ?? "/api/health";
   let openMode = existing?.openMode || "browser";
+  let allowInsecureTls = existing?.allowInsecureTls ?? false;
   let notes = existing?.notes ?? "";
 
   const closeModal = () => {
@@ -208,6 +209,15 @@ export function openServiceModal(
             </div>
           </div>
 
+          ${
+            protocol === "https"
+              ? `<div class="field" style="display:flex;align-items:center;gap:8px;">
+                  <input id="svc-insecure-tls" type="checkbox" ${allowInsecureTls ? "checked" : ""} />
+                  <label for="svc-insecure-tls" style="margin:0;cursor:pointer;">${escapeHtml(curCopy.serviceModal.allowInsecureTls)}</label>
+                </div>`
+              : ""
+          }
+
           ${hintText ? `<div class="hint-box">${escapeHtml(hintText)}</div>` : ""}
 
           <div class="field">
@@ -226,8 +236,23 @@ export function openServiceModal(
     backdrop.querySelector("#svc-close")?.addEventListener("click", closeModal);
     backdrop.querySelector("#svc-cancel")?.addEventListener("click", closeModal);
 
+    const captureDraft = () => {
+      name = backdrop.querySelector<HTMLInputElement>("#svc-name")?.value ?? name;
+      hostId = backdrop.querySelector<HTMLSelectElement>("#svc-host")?.value ?? hostId;
+      remoteHost = backdrop.querySelector<HTMLInputElement>("#svc-remote-host")?.value ?? remoteHost;
+      const rp = parseInt(backdrop.querySelector<HTMLInputElement>("#svc-remote-port")?.value ?? "", 10);
+      if (Number.isFinite(rp)) remotePort = rp;
+      basePath = backdrop.querySelector<HTMLInputElement>("#svc-base-path")?.value ?? basePath;
+      const lp = parseInt(backdrop.querySelector<HTMLInputElement>("#svc-local-port")?.value ?? "", 10);
+      if (Number.isFinite(lp)) localPort = lp;
+      healthPath = backdrop.querySelector<HTMLInputElement>("#svc-health-path")?.value ?? healthPath;
+      openMode = (backdrop.querySelector<HTMLSelectElement>("#svc-open-mode")?.value ?? openMode) as any;
+      notes = backdrop.querySelector<HTMLInputElement>("#svc-notes")?.value ?? notes;
+    };
+
     const presetEl = backdrop.querySelector<HTMLSelectElement>("#svc-preset");
     presetEl?.addEventListener("change", (e) => {
+      captureDraft();
       const selected = (e.target as HTMLSelectElement).value;
       preset = selected as any;
       const pMeta = SERVICE_PRESETS[selected];
@@ -236,10 +261,28 @@ export function openServiceModal(
           name = pMeta.label.split(" (")[0];
         }
         protocol = pMeta.protocol;
+        if (protocol !== "https") {
+          allowInsecureTls = false;
+        }
         remotePort = pMeta.remotePort;
         healthPath = pMeta.healthPath;
       }
       render();
+    });
+
+    const protocolEl = backdrop.querySelector<HTMLSelectElement>("#svc-protocol");
+    protocolEl?.addEventListener("change", (e) => {
+      captureDraft();
+      protocol = (e.target as HTMLSelectElement).value as any;
+      if (protocol !== "https") {
+        allowInsecureTls = false;
+      }
+      render();
+    });
+
+    const insecureTlsEl = backdrop.querySelector<HTMLInputElement>("#svc-insecure-tls");
+    insecureTlsEl?.addEventListener("change", (e) => {
+      allowInsecureTls = (e.target as HTMLInputElement).checked;
     });
 
     const formEl = backdrop.querySelector<HTMLFormElement>("#svc-form");
@@ -256,6 +299,9 @@ export function openServiceModal(
       const localPortVal = parseInt(backdrop.querySelector<HTMLInputElement>("#svc-local-port")?.value ?? "0", 10) || 0;
       const healthPathVal = (backdrop.querySelector<HTMLInputElement>("#svc-health-path")?.value ?? "").trim();
       const openModeVal = (backdrop.querySelector<HTMLSelectElement>("#svc-open-mode")?.value ?? "browser") as any;
+      const allowInsecureTlsVal =
+        protocolVal === "https" &&
+        Boolean(backdrop.querySelector<HTMLInputElement>("#svc-insecure-tls")?.checked);
       const notesVal = (backdrop.querySelector<HTMLInputElement>("#svc-notes")?.value ?? "").trim();
 
       const payload: SaveServiceInput = {
@@ -269,6 +315,7 @@ export function openServiceModal(
         localPort: localPortVal,
         healthPath: healthPathVal,
         openMode: openModeVal,
+        allowInsecureTls: allowInsecureTlsVal,
         notes: notesVal,
       };
 

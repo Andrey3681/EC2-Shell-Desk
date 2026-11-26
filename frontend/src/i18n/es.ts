@@ -114,6 +114,7 @@ export const es = {
     openMode: "Modo de visualización",
     openModeBrowser: "Navegador externo (Recomendado)",
     openModeEmbedded: "Pestaña embebida (Próximamente)",
+    allowInsecureTls: "Permitir certificado TLS autofirmado (solo servicios internos)",
     notes: "Notas",
     notesPlaceholder: "Credenciales de prueba, versión o notas...",
     hintGrafana: "Grafana se abre en 127.0.0.1 con puerto local. Salud probada en /api/health.",
