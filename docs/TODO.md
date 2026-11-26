@@ -38,3 +38,11 @@
 - [x] Soporte bilingüe en `frontend/src/i18n/` (`es` / `en`)
 - [ ] Validar prueba manual en Windows contra una instancia EC2 real (`docs/verificacion.md`)
 - [x] Compilar `.exe` portátil (`task build`) (instalador NSIS opcional con `task build-installer` si NSIS está instalado)
+
+## Fase 5 — Evolución Operativa y Hardening
+- [x] Grupos de instancias definidos por el usuario (`002_host_groups.sql`)
+- [x] Túneles SSH de reenvío local para bases de datos con multiplexación sobre conexiones SSH compartidas (`002_ssh_tunnels.sql`)
+- [x] Snippets de comandos con alcance por instancia/grupo y difusión multi-sesión (`003_command_snippets.sql`, `004_snippet_host_scope.sql`)
+- [x] Portal de servicios privados y observabilidad con puerto `HealthProber`, adaptador `httpprobe` reutilizable y `AllowInsecureTLS` opt-in (`005_private_services.sql`, `006_service_insecure_tls.sql`)
+- [x] Rediseño SFTP Modern Commander Dual-Pane con subida recursiva de carpetas y modos `docked` / `floating` / `maximized`
+- [x] Hardening integral: guarda de borrado de host por servicios privados, validación de propiedad en `ProbeServiceHealth`, poda acotada del historial SFTP, backoff exponencial en login y `golangci-lint v2` sobre Go 1.27

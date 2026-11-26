@@ -2,8 +2,8 @@
 
 ## 1. Alcance Funcional ("Sin Bloat")
 
-La aplicación resuelve exclusivamente el flujo:
-**Usuario Local → Bóveda de Llaves SSH → Instancias EC2 / VMs Linux → Terminal SSH + SFTP Dual-Pane**.
+La aplicación resuelve el flujo operativo diario sobre instancias EC2 y servidores Linux:
+**Usuario Local → Bóveda de Llaves SSH → Grupos e Instancias EC2 → Terminal SSH + SFTP Modern Commander + Túneles DB + Snippets + Portal de Observabilidad Privada**.
 
 Quedan fuera de alcance protocolos heredados como Telnet, Serial/COM, Rlogin, X11 forwarding o motores de scripting propietarios.
 
@@ -39,11 +39,24 @@ Quedan fuera de alcance protocolos heredados como Telnet, Serial/COM, Rlogin, X1
    - Si la huella cambió respecto a la guardada, aborta inmediatamente con alerta de seguridad.
 4. Se abre un PTY (`xterm-256color`) y aparece una nueva pestaña interactiva en `xterm.js`.
 
-### UC-05: Explorador Dual-Pane SFTP (Modo Xftp)
-1. Sobre cualquier sesión conectada, el usuario abre o expande el panel SFTP acoplado.
-2. Panel izquierdo: sistema de archivos local de Windows (`C:\`, `D:\`, carpetas de usuario).
-3. Panel derecho: sistema de archivos remoto en la instancia EC2.
-4. Acciones soportadas: navegar directorios, subir documentos (botón o *drag & drop*), descargar a Windows, crear carpeta (`Mkdir`), renombrar (`Rename`), eliminar (`Remove`) y cancelar transferencias en curso.
+### UC-05: Explorador Modern Commander SFTP (Modo Xftp)
+1. Sobre cualquier sesión conectada, el usuario abre el gestor SFTP en modo **Acoplado inferior redimensionable**, **Flotante movible** o **Maximizado** (manteniendo siempre sincronizado el contexto de la pestaña SSH activa).
+2. Panel izquierdo: sistema de archivos local de Windows (`C:\`, `D:\`, migas de pan interactivas, filtro rápido, selección múltiple).
+3. Panel derecho: sistema de archivos remoto en la instancia EC2 (migas de pan POSIX, permisos, tamaño, filtro rápido).
+4. Acciones soportadas: navegar directorios, **subir carpetas completas recursivamente** (`MkdirAll` + streaming acumulado), subir archivos (diálogo nativo, selección múltiple o *drag & drop*), descargar a Windows, crear carpeta (`Mkdir`), renombrar (`Rename`), eliminar (`Remove`) y cancelar transferencias en curso.
+
+### UC-06: Grupos de Instancias y Snippets de Comandos
+1. El usuario crea grupos (`HostGroup`) para organizar instancias por proyecto o cliente.
+2. En la pestaña **Snippets**, define comandos reutilizables con alcance por instancia específica, por grupo o globales, eligiendo entre ejecución automática (`Auto-Enter`) o pegado seguro.
+3. Puede ejecutar un snippet en la terminal activa o difundirlo (*broadcast*) hacia todas las sesiones SSH abiertas.
+
+### UC-07: Túneles SSH de Base de Datos
+1. En la pestaña **Túneles**, el usuario registra reenvíos locales hacia AWS RDS, DocumentDB, ElastiCache o servicios TCP internos usando una instancia EC2 como bastión.
+2. Al iniciar varios túneles hacia el mismo bastión, `sshclient` multiplexa los canales sobre una única conexión SSH compartida, reportando conexiones activas y bytes transferidos en vivo.
+
+### UC-08: Portal de Servicios Privados y Observabilidad
+1. En la pestaña **Servicios** (o desde el acceso rápido `Servicios (N)` de cada instancia), el usuario registra servicios internos (Grafana, Prometheus, Loki, Mailpit, Portainer, Netdata, Uptime Kuma o HTTP/HTTPS personalizado con subruta Nginx/Traefik).
+2. Con 1 clic, `ObservabilityService` levanta un túnel loopback en `127.0.0.1`, ejecuta un sondeo de salud mediante el puerto `HealthProber` (TLS 1.2+ estricto por defecto u opt-in `AllowInsecureTLS` para certificados autofirmados) y abre el servicio en el navegador local sin exponer puertos de la EC2 a Internet.
 
 ## 3. Diagramas de Flujo
 

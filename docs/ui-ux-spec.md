@@ -7,18 +7,19 @@
    - En arranques posteriores: selector de usuario local + campo contraseña para desbloquear su bóveda.
 2. **Espacio de Trabajo Principal (`WorkspaceView`)**
    - **Barra Superior (`TopBar`):** Usuario activo, selector de idioma (`ES` / `EN`), botón **Bóveda de Llaves**, botón **Bloquear Sesión**.
-   - **Panel Lateral Izquierdo (`InstanceSidebar`):**
-     - Buscador rápido de instancias y filtro por entorno (`Prod`, `Staging`, `Dev`).
-     - Lista de instancias EC2 con estado de conexión, usuario SSH y llave asociada.
-     - Botón `+ Nueva Instancia` y acciones rápidas (`Conectar SSH`, `Editar`, `Eliminar`).
+   - **Panel Lateral Izquierdo (4 Pestañas):**
+     - **Instancias (`InstanceSidebar`):** Grupos plegables definidos por el usuario, buscador, filtro por entorno (`Prod`, `Staging`, `Dev`), botón `+ Nueva Instancia` y accesos rápidos (`Conectar`, `Snippets`, `Servicios (N)`, `Editar`, `Eliminar`).
+     - **Túneles (`TunnelSidebar`):** Reenvíos SSH locales para bases de datos con estado en vivo, conexiones activas y tráfico.
+     - **Snippets (`SnippetSidebar`):** Comandos filtrables por instancia activa y grupo, con ejecución individual y difusión a todas las sesiones.
+     - **Servicios (`ServiceSidebar`):** Portal de servicios privados de observabilidad con estado de salud HTTP, latencia y apertura en navegador en 1 clic.
    - **Área Central (`TerminalTabs`):**
      - Pestañas por cada sesión SSH abierta (estilo Xshell) con indicador de estado y botón de cierre limpio.
      - Emulador `xterm.js` con soporte ANSI/VT100, copiar/pegar rápido, ajuste automático de fuente y `FitAddon` al redimensionar la ventana.
-     - Botón toggle en cabecera de pestaña para mostrar/ocultar el **Panel SFTP (Xftp)**.
-   - **Panel Acoplado / Split Inferior o Lateral (`XftpDualPane`):**
-     - **Panel Local (Windows):** Selector de unidad (`C:\`, `D:\`), breadcrumb de ruta, tabla de archivos/carpetas, botón subir y zona *drag & drop*.
-     - **Panel Remoto (EC2/Linux):** Breadcrumb POSIX (`/home/ec2-user`), tabla con nombre, tamaño, permisos y fecha, acciones (`Descargar`, `Nueva Carpeta`, `Renombrar`, `Eliminar`).
-     - **Cola de Transferencias (`TransferQueue`):** Lista inferior compacta con barra de progreso, velocidad/bytes transferidos, estado y botón `Cancelar`.
+     - Botón toggle en cabecera de pestaña sincronizado con el cierre interno del **Panel SFTP (Xftp)**.
+   - **Gestor de Archivos SFTP (`XftpDualPane` — Modern Commander):**
+     - **Modos de vista configurables (persistentes):** **Abajo** (con divisor horizontal arrastrable), **Flotante** (movible y redimensionable sobre la terminal) y **Maximizado** (manteniendo las pestañas SSH visibles arriba), siempre con badge de la instancia activa.
+     - **Panel Local (Windows) ↔ Panel Remoto (EC2/Linux):** Migas de pan clicables con edición de ruta, iconos SVG por tipo de archivo, filtro rápido, selección múltiple, barra superior contextual sin botones repetitivos por fila, *drag & drop* entre paneles y botón dedicado **`Subir carpeta`** recursivo.
+     - **Cola de Transferencias (`TransferQueue`):** Sección colapsable inferior con barra de progreso, estado y botón `Cancelar`.
 3. **Modales Clave**
    - **Modal Bóveda de Llaves (`KeyVaultModal`):** Importar `.pem` / OpenSSH mediante diálogo nativo Windows, ver huella SHA-256 y eliminar llaves no usadas o desvincularlas.
    - **Modal Verificación TOFU (`HostKeyTrustModal`):** Muestra host, puerto, algoritmo y huella SHA-256 en primera conexión o alerta roja si la huella cambió.

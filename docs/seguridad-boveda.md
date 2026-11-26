@@ -19,9 +19,10 @@ Contraseña del Usuario + vault_salt (16 bytes aleatorios)
 ```
 
 ### Detalles Técnicos
-- **Verificación de Login (`password_hash` + `auth_salt`):** Se usa un `auth_salt` independiente del `vault_salt` para verificar la contraseña del usuario mediante comparación en tiempo constante (`subtle.ConstantTimeCompare`).
+- **Verificación de Login (`password_hash` + `auth_salt`) y Backoff Progresivo:** Se usa un `auth_salt` independiente del `vault_salt` con comparación en tiempo constante (`subtle.ConstantTimeCompare`). Tras 5 intentos fallidos consecutivos, `AuthService.Login` aplica enfriamiento exponencial (`2s` hasta `60s`, `ErrTooManyAttempts`) antes de invocar Argon2id.
 - **Authenticated Encryption (AES-256-GCM):** Garantiza confidencialidad e integridad. El parámetro AAD (`ownerUserID:keyID`) impide mover un registro cifrado de un usuario a otro.
-- **Bloqueo y Limpieza de Memoria:** Al cerrar sesión, bloquear la bóveda o cerrar la aplicación, los buffers de clave maestra y llaves descifradas se sobrescriben con ceros (`ZeroBytes`) antes de liberar referencias.
+- **Bloqueo y Limpieza de Memoria:** Al cerrar sesión, bloquear la bóveda o cerrar la aplicación, se cierran sesiones, túneles y servicios activos, y los buffers de clave maestra y llaves descifradas se sobrescriben con ceros (`ZeroBytes`) antes de liberar referencias.
+- **Sondeos HTTPS de Observabilidad (`HealthProber`):** El adaptador `httpprobe` aplica TLS 1.2+ con validación estricta de certificados por defecto; omitir la verificación solo es posible mediante opt-in explícito por servicio (`allow_insecure_tls`) sobre túnel SSH loopback autenticado.
 
 ## 3. Verificación de Host Remoto (`known_hosts` TOFU)
 

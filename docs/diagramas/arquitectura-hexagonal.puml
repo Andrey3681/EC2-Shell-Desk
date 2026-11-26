@@ -3,7 +3,7 @@
 title EC2 Shell Desk - Arquitectura Hexagonal (Wails v2 + Go)
 
 package "Frontend Desktop (WebView2)" {
-  [TypeScript + Vite + xterm.js] as UI
+  [Vanilla TypeScript + Vite + xterm.js] as UI
   [Wails Bindings & Events] as IPC
   UI --> IPC
 }
@@ -14,6 +14,9 @@ package "Driving Adapters (internal/app)" {
   [KeyHandler]
   [TerminalHandler]
   [SFTPHandler]
+  [TunnelHandler]
+  [SnippetHandler]
+  [ObservabilityHandler]
 }
 
 package "Application Services (internal/services)" {
@@ -22,6 +25,9 @@ package "Application Services (internal/services)" {
   [HostService]
   [SessionService]
   [TransferService]
+  [TunnelService]
+  [SnippetService]
+  [ObservabilityService]
 }
 
 package "Core Hexagon (internal/core)" {
@@ -29,16 +35,25 @@ package "Core Hexagon (internal/core)" {
     interface UserRepository
     interface KeyRepository
     interface HostRepository
+    interface HostGroupRepository
+    interface TunnelRepository
+    interface SnippetRepository
+    interface ServiceRepository
     interface KeyEncryptor
     interface PasswordHasher
     interface SSHSessionManager
     interface SFTPClient
     interface LocalFileSystem
+    interface HealthProber
   }
   package "domain" {
     [User]
     [SSHKey]
+    [HostGroup]
     [HostInstance]
+    [SSHTunnel]
+    [CommandSnippet]
+    [PrivateService]
     [FileEntry]
     [TransferTask]
   }
@@ -47,9 +62,10 @@ package "Core Hexagon (internal/core)" {
 package "Driven Adapters (internal/adapters)" {
   [sqlite (modernc.org/sqlite)] as SQLite
   [crypto (Argon2id + AES-256-GCM)] as Crypto
-  [sshclient (x/crypto/ssh)] as SSH
+  [sshclient (x/crypto/ssh + Pool)] as SSH
   [sftpclient (pkg/sftp)] as SFTP
   [winfs (Windows Disk)] as WinFS
+  [httpprobe (net/http TLS 1.2+)] as HTTPProbe
 }
 
 IPC --> [AuthHandler]
@@ -57,29 +73,47 @@ IPC --> [HostHandler]
 IPC --> [KeyHandler]
 IPC --> [TerminalHandler]
 IPC --> [SFTPHandler]
+IPC --> [TunnelHandler]
+IPC --> [SnippetHandler]
+IPC --> [ObservabilityHandler]
 
 [AuthHandler] --> [AuthService]
 [HostHandler] --> [HostService]
 [KeyHandler] --> [VaultService]
 [TerminalHandler] --> [SessionService]
 [SFTPHandler] --> [TransferService]
+[TunnelHandler] --> [TunnelService]
+[SnippetHandler] --> [SnippetService]
+[ObservabilityHandler] --> [ObservabilityService]
 
 [AuthService] --> UserRepository
 [AuthService] --> PasswordHasher
 [VaultService] --> KeyRepository
 [VaultService] --> KeyEncryptor
 [HostService] --> HostRepository
+[HostService] --> HostGroupRepository
 [SessionService] --> SSHSessionManager
 [TransferService] --> SFTPClient
 [TransferService] --> LocalFileSystem
+[TunnelService] --> TunnelRepository
+[TunnelService] --> SSHSessionManager
+[SnippetService] --> SnippetRepository
+[ObservabilityService] --> ServiceRepository
+[ObservabilityService] --> SSHSessionManager
+[ObservabilityService] --> HealthProber
 
 SQLite ..|> UserRepository
 SQLite ..|> KeyRepository
 SQLite ..|> HostRepository
+SQLite ..|> HostGroupRepository
+SQLite ..|> TunnelRepository
+SQLite ..|> SnippetRepository
+SQLite ..|> ServiceRepository
 Crypto ..|> KeyEncryptor
 Crypto ..|> PasswordHasher
 SSH ..|> SSHSessionManager
 SFTP ..|> SFTPClient
 WinFS ..|> LocalFileSystem
+HTTPProbe ..|> HealthProber
 
 @enduml
