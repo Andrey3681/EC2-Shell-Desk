@@ -169,7 +169,15 @@ export class TerminalTabsManager {
     }
   }
 
+  public setSftpVisible(visible: boolean): void {
+    if (this.sftpVisible === visible) return;
+    this.sftpVisible = visible;
+    this.render();
+    requestAnimationFrame(() => this.fitActive());
+  }
+
   public disposeAll(): void {
+    this.resizeObserver.disconnect();
     for (const rec of this.tabs.values()) {
       rec.unsubData();
       rec.unsubClosed();
@@ -178,6 +186,7 @@ export class TerminalTabsManager {
     }
     this.tabs.clear();
     this.activeSessionId = "";
+    this.sftpVisible = false;
     this.render();
   }
 

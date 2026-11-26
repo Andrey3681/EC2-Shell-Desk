@@ -717,6 +717,7 @@ async function mountWorkspace(): Promise<void> {
 
   xftpPane = new XftpDualPane(xftpEl, () => {
     xftpEl.style.display = "none";
+    terminalMgr?.setSftpVisible(false);
   });
   terminalMgr = new TerminalTabsManager(
     tabsBar,
