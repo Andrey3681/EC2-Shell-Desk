@@ -21,6 +21,9 @@ var (
 	// ErrInvalidCredentials indicates an unrecognized username or incorrect password.
 	ErrInvalidCredentials = errors.New("invalid credentials")
 
+	// ErrTooManyAttempts indicates that local authentication is temporarily rate-limited after consecutive failed attempts.
+	ErrTooManyAttempts = errors.New("too many failed login attempts")
+
 	// ErrUserAlreadyExists indicates that a user with the requested username already exists.
 	ErrUserAlreadyExists = errors.New("user already exists")
 
