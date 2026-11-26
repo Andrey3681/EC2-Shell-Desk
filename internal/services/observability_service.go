@@ -283,8 +283,11 @@ func (s *ObservabilityService) StartService(
 	s.emitStatus(rs.status)
 	go s.watchTunnelExit(svc.ID, handle)
 
-	// Perform initial health probe in background or synchronous quick check
-	status := s.ProbeServiceHealth(ctx, svc.ID)
+	// Perform initial health probe over the newly established loopback tunnel.
+	status, probeErr := s.ProbeServiceHealth(ctx, svc.ID)
+	if probeErr != nil {
+		return rs.status, nil
+	}
 	return status, nil
 }
 
@@ -315,17 +318,32 @@ func (s *ObservabilityService) StopService(serviceID string) error {
 	return nil
 }
 
-// ProbeServiceHealth sends an HTTP GET probe to the service's health path through the active tunnel.
-func (s *ObservabilityService) ProbeServiceHealth(ctx context.Context, serviceID string) domain.ServiceRuntimeStatus {
+// ProbeServiceHealth sends an HTTP GET probe to an owned service's health path through its active tunnel.
+func (s *ObservabilityService) ProbeServiceHealth(ctx context.Context, serviceID string) (domain.ServiceRuntimeStatus, error) {
+	trimmedID := strings.TrimSpace(serviceID)
+	if trimmedID == "" {
+		return domain.ServiceRuntimeStatus{}, fmt.Errorf("%w: service id is required", domain.ErrInvalidInput)
+	}
+
+	user, err := s.auth.CurrentUser()
+	if err != nil {
+		return domain.ServiceRuntimeStatus{}, err
+	}
+
+	if _, err := s.services.GetByID(ctx, user.ID, trimmedID); err != nil {
+		return domain.ServiceRuntimeStatus{}, fmt.Errorf("lookup private service: %w", err)
+	}
+
 	s.mu.RLock()
-	rs, ok := s.active[serviceID]
-	if !ok || rs.handle == nil {
+	rs, ok := s.active[trimmedID]
+	if !ok || rs.handle == nil || rs.status.OwnerUserID != user.ID {
 		s.mu.RUnlock()
 		return domain.ServiceRuntimeStatus{
-			ServiceID:    serviceID,
+			ServiceID:    trimmedID,
+			OwnerUserID:  user.ID,
 			State:        domain.TunnelStateStopped,
 			HealthStatus: domain.ServiceHealthUnknown,
-		}
+		}, nil
 	}
 	svc := rs.service
 	localPort := rs.localPort
@@ -340,21 +358,25 @@ func (s *ObservabilityService) ProbeServiceHealth(ctx context.Context, serviceID
 	client := &http.Client{
 		Timeout: 3 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Allow local self-signed dev/testing
+			// #nosec G402 -- health probe traverses an authenticated SSH loopback tunnel to internal/self-signed endpoints.
+			TLSClientConfig: &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: true,
+			},
 		},
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
 	now := time.Now().UTC()
 	if err != nil {
-		return s.updateHealth(serviceID, domain.ServiceHealthUnhealthy, 0, 0, err.Error(), now)
+		return s.updateHealth(trimmedID, user.ID, domain.ServiceHealthUnhealthy, 0, 0, err.Error(), now), nil
 	}
 
 	start := time.Now()
 	resp, err := client.Do(req)
 	latency := time.Since(start).Milliseconds()
 	if err != nil {
-		return s.updateHealth(serviceID, domain.ServiceHealthUnhealthy, 0, latency, err.Error(), now)
+		return s.updateHealth(trimmedID, user.ID, domain.ServiceHealthUnhealthy, 0, latency, err.Error(), now), nil
 	}
 	_ = resp.Body.Close()
 
@@ -364,11 +386,12 @@ func (s *ObservabilityService) ProbeServiceHealth(ctx context.Context, serviceID
 		healthStatus = domain.ServiceHealthDegraded
 	}
 
-	return s.updateHealth(serviceID, healthStatus, resp.StatusCode, latency, "", now)
+	return s.updateHealth(trimmedID, user.ID, healthStatus, resp.StatusCode, latency, "", now), nil
 }
 
 func (s *ObservabilityService) updateHealth(
 	serviceID string,
+	ownerUserID string,
 	health domain.ServiceHealthStatus,
 	httpStatus int,
 	latencyMs int64,
@@ -379,9 +402,10 @@ func (s *ObservabilityService) updateHealth(
 	defer s.mu.Unlock()
 
 	rs, ok := s.active[serviceID]
-	if !ok {
+	if !ok || rs.status.OwnerUserID != ownerUserID {
 		return domain.ServiceRuntimeStatus{
 			ServiceID:    serviceID,
+			OwnerUserID:  ownerUserID,
 			State:        domain.TunnelStateStopped,
 			HealthStatus: health,
 		}

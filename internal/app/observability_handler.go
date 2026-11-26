@@ -63,8 +63,8 @@ func (h *ObservabilityHandler) StopService(serviceID string) error {
 	return h.services.StopService(serviceID)
 }
 
-// ProbeServiceHealth runs an immediate HTTP probe against the service.
-func (h *ObservabilityHandler) ProbeServiceHealth(serviceID string) domain.ServiceRuntimeStatus {
+// ProbeServiceHealth runs an immediate HTTP probe against an owned service.
+func (h *ObservabilityHandler) ProbeServiceHealth(serviceID string) (domain.ServiceRuntimeStatus, error) {
 	return h.services.ProbeServiceHealth(h.bridge.Context(), serviceID)
 }
 

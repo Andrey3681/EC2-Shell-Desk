@@ -153,7 +153,13 @@ func TestObservabilityServiceLifecycleHealthAndIsolation(t *testing.T) {
 		t.Fatalf("ListStatuses = (%+v, %v), want 1", statuses, err)
 	}
 
-	// Bob isolation checks
+	// Explicit health probe by Alice succeeds.
+	probed, err := obsSvc.ProbeServiceHealth(ctx, created.ID)
+	if err != nil || probed.HealthStatus != domain.ServiceHealthHealthy {
+		t.Fatalf("Alice ProbeServiceHealth = (%+v, %v), want healthy", probed, err)
+	}
+
+	// Bob isolation checks (while Alice's service is still in the active map before UI lock/close)
 	if _, err := authSvc.Login(ctx, "bob", "BobPass!2026"); err != nil {
 		t.Fatalf("Login(bob): %v", err)
 	}
@@ -161,11 +167,20 @@ func TestObservabilityServiceLifecycleHealthAndIsolation(t *testing.T) {
 	if err != nil || len(bobList) != 0 {
 		t.Fatalf("Bob ListServices = (%d, %v), want 0", len(bobList), err)
 	}
+	if _, err := obsSvc.ProbeServiceHealth(ctx, created.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Bob ProbeServiceHealth = %v, want ErrNotFound", err)
+	}
 	if _, err := obsSvc.StartService(ctx, created.ID, "", tofuVerifier); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("Bob StartService = %v, want ErrNotFound", err)
 	}
 	if err := obsSvc.DeleteService(ctx, created.ID); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("Bob DeleteService = %v, want ErrNotFound", err)
+	}
+
+	// Locked vault check on ProbeServiceHealth
+	authSvc.Lock()
+	if _, err := obsSvc.ProbeServiceHealth(ctx, created.ID); !errors.Is(err, domain.ErrVaultLocked) {
+		t.Fatalf("Locked ProbeServiceHealth = %v, want ErrVaultLocked", err)
 	}
 
 	// Alice logs back in and stops service
