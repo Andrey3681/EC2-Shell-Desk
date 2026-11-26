@@ -68,21 +68,22 @@ const MaxServiceNameLength = 128
 
 // PrivateService represents a user-configured internal web service running on an EC2 instance / VM.
 type PrivateService struct {
-	ID          string          `json:"id"`
-	OwnerUserID string          `json:"ownerUserId"`
-	HostID      string          `json:"hostId"`
-	Name        string          `json:"name"`
-	Preset      ServicePreset   `json:"preset"`
-	Protocol    ServiceProtocol `json:"protocol"`
-	RemoteHost  string          `json:"remoteHost"`
-	RemotePort  int             `json:"remotePort"`
-	BasePath    string          `json:"basePath"`
-	LocalPort   int             `json:"localPort"`
-	HealthPath  string          `json:"healthPath"`
-	OpenMode    ServiceOpenMode `json:"openMode"`
-	Notes       string          `json:"notes"`
-	CreatedAt   time.Time       `json:"createdAt"`
-	UpdatedAt   time.Time       `json:"updatedAt"`
+	ID               string          `json:"id"`
+	OwnerUserID      string          `json:"ownerUserId"`
+	HostID           string          `json:"hostId"`
+	Name             string          `json:"name"`
+	Preset           ServicePreset   `json:"preset"`
+	Protocol         ServiceProtocol `json:"protocol"`
+	RemoteHost       string          `json:"remoteHost"`
+	RemotePort       int             `json:"remotePort"`
+	BasePath         string          `json:"basePath"`
+	LocalPort        int             `json:"localPort"`
+	HealthPath       string          `json:"healthPath"`
+	OpenMode         ServiceOpenMode `json:"openMode"`
+	AllowInsecureTLS bool            `json:"allowInsecureTls"`
+	Notes            string          `json:"notes"`
+	CreatedAt        time.Time       `json:"createdAt"`
+	UpdatedAt        time.Time       `json:"updatedAt"`
 }
 
 // Validate verifies constraints for PrivateService fields.
