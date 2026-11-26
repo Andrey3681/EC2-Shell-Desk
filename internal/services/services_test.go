@@ -10,6 +10,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	_ "modernc.org/sqlite"
@@ -130,6 +131,44 @@ func TestAuthBootstrapLoginLockAndMultiUser(t *testing.T) {
 	loggedIn, err := authSvc.Login(ctx, "admin", "AdminPass!2026")
 	if err != nil || loggedIn.ID != admin.ID {
 		t.Fatalf("Login(valid) = (%+v, %v)", loggedIn, err)
+	}
+}
+
+func TestAuthLoginProgressiveBackoff(t *testing.T) {
+	ctx := context.Background()
+	_, authSvc, _, _ := setupPhase2Stack(t)
+
+	if _, err := authSvc.BootstrapInitialUser(ctx, "admin", "AdminPass!2026"); err != nil {
+		t.Fatalf("BootstrapInitialUser() error = %v", err)
+	}
+	authSvc.Lock()
+	authSvc.SetLoginBackoff(3, 40*time.Millisecond, 160*time.Millisecond)
+
+	// First 3 consecutive wrong passwords return ErrInvalidCredentials.
+	for i := 0; i < 3; i++ {
+		if _, err := authSvc.Login(ctx, "admin", "WrongPassword"); !errors.Is(err, domain.ErrInvalidCredentials) {
+			t.Fatalf("attempt %d: Login(wrong) = %v, want ErrInvalidCredentials", i+1, err)
+		}
+	}
+
+	// Immediate next attempt (even with valid password) is rate-limited with ErrTooManyAttempts.
+	if _, err := authSvc.Login(ctx, "admin", "AdminPass!2026"); !errors.Is(err, domain.ErrTooManyAttempts) {
+		t.Fatalf("Login during backoff = %v, want ErrTooManyAttempts", err)
+	}
+
+	// Once cooldown elapses, valid login succeeds and resets the failure counter.
+	time.Sleep(55 * time.Millisecond)
+	if _, err := authSvc.Login(ctx, "admin", "AdminPass!2026"); err != nil {
+		t.Fatalf("Login after backoff = %v, want nil", err)
+	}
+
+	// After reset, a single mistyped password does not trigger immediate backoff.
+	authSvc.Lock()
+	if _, err := authSvc.Login(ctx, "admin", "WrongOnce"); !errors.Is(err, domain.ErrInvalidCredentials) {
+		t.Fatalf("Login(wrong once after reset) = %v, want ErrInvalidCredentials", err)
+	}
+	if _, err := authSvc.Login(ctx, "admin", "AdminPass!2026"); err != nil {
+		t.Fatalf("Login(valid after single mistake) = %v, want nil", err)
 	}
 }
 

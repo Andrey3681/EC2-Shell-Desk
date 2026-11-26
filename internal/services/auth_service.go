@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,17 @@ import (
 	"ec2-shell-desk/internal/core/ports"
 )
 
+const (
+	defaultMaxFailedLoginAttempts = 5
+	defaultLoginBaseBackoff       = 2 * time.Second
+	defaultLoginMaxBackoff        = 60 * time.Second
+)
+
+type loginAttemptState struct {
+	failures    int
+	lockedUntil time.Time
+}
+
 // AuthService manages local user bootstrapping, authentication, and in-memory vault unlocking.
 type AuthService struct {
 	users    ports.UserRepository
@@ -21,14 +33,41 @@ type AuthService struct {
 	mu       sync.RWMutex
 	active   *domain.UserProfile
 	vaultKey []byte
+
+	backoffMu   sync.Mutex
+	attempts    map[string]*loginAttemptState
+	maxFailures int
+	baseBackoff time.Duration
+	maxBackoff  time.Duration
+	nowFunc     func() time.Time
 }
 
 // NewAuthService constructs an AuthService with the required repository and cryptography ports.
 func NewAuthService(users ports.UserRepository, hasher ports.PasswordHasher, encrypt ports.KeyEncryptor) *AuthService {
 	return &AuthService{
-		users:   users,
-		hasher:  hasher,
-		encrypt: encrypt,
+		users:       users,
+		hasher:      hasher,
+		encrypt:     encrypt,
+		attempts:    make(map[string]*loginAttemptState),
+		maxFailures: defaultMaxFailedLoginAttempts,
+		baseBackoff: defaultLoginBaseBackoff,
+		maxBackoff:  defaultLoginMaxBackoff,
+		nowFunc:     time.Now,
+	}
+}
+
+// SetLoginBackoff customizes the consecutive-failure threshold and exponential cooldown window for Login.
+func (s *AuthService) SetLoginBackoff(maxFailures int, baseDelay, maxDelay time.Duration) {
+	s.backoffMu.Lock()
+	defer s.backoffMu.Unlock()
+	if maxFailures > 0 {
+		s.maxFailures = maxFailures
+	}
+	if baseDelay > 0 {
+		s.baseBackoff = baseDelay
+	}
+	if maxDelay >= baseDelay && maxDelay > 0 {
+		s.maxBackoff = maxDelay
 	}
 }
 
@@ -95,12 +134,23 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (dom
 		return domain.UserProfile{}, fmt.Errorf("%w: username and password are required", domain.ErrInvalidCredentials)
 	}
 
+	userKey := strings.ToLower(trimmedUser)
+	if remaining := s.checkLoginBackoff(userKey); remaining > 0 {
+		waitSecs := int(math.Ceil(remaining.Seconds()))
+		if waitSecs < 1 {
+			waitSecs = 1
+		}
+		return domain.UserProfile{}, fmt.Errorf("%w: try again in %ds", domain.ErrTooManyAttempts, waitSecs)
+	}
+
 	user, err := s.users.GetByUsername(ctx, trimmedUser)
 	if err != nil {
+		s.recordLoginFailure(userKey)
 		return domain.UserProfile{}, fmt.Errorf("%w", domain.ErrInvalidCredentials)
 	}
 
 	if !s.hasher.VerifyPassword(password, user.AuthSalt, user.PasswordHash) {
+		s.recordLoginFailure(userKey)
 		return domain.UserProfile{}, fmt.Errorf("%w", domain.ErrInvalidCredentials)
 	}
 
@@ -109,6 +159,7 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (dom
 		return domain.UserProfile{}, fmt.Errorf("derive vault master key: %w", err)
 	}
 
+	s.clearLoginFailures(userKey)
 	profile := user.Profile()
 	s.setSession(profile, masterKey)
 	return profile, nil
@@ -199,4 +250,49 @@ func wipeBytes(b []byte) {
 	for i := range b {
 		b[i] = 0
 	}
+}
+
+func (s *AuthService) checkLoginBackoff(userKey string) time.Duration {
+	s.backoffMu.Lock()
+	defer s.backoffMu.Unlock()
+
+	st, ok := s.attempts[userKey]
+	if !ok || st.lockedUntil.IsZero() {
+		return 0
+	}
+	now := s.nowFunc()
+	if now.Before(st.lockedUntil) {
+		return st.lockedUntil.Sub(now)
+	}
+	return 0
+}
+
+func (s *AuthService) recordLoginFailure(userKey string) {
+	s.backoffMu.Lock()
+	defer s.backoffMu.Unlock()
+
+	st, ok := s.attempts[userKey]
+	if !ok {
+		st = &loginAttemptState{}
+		s.attempts[userKey] = st
+	}
+	st.failures++
+
+	if st.failures >= s.maxFailures {
+		shift := st.failures - s.maxFailures
+		if shift > 10 {
+			shift = 10
+		}
+		delay := s.baseBackoff << shift
+		if delay > s.maxBackoff || delay <= 0 {
+			delay = s.maxBackoff
+		}
+		st.lockedUntil = s.nowFunc().Add(delay)
+	}
+}
+
+func (s *AuthService) clearLoginFailures(userKey string) {
+	s.backoffMu.Lock()
+	defer s.backoffMu.Unlock()
+	delete(s.attempts, userKey)
 }
