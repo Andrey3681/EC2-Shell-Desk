@@ -382,12 +382,14 @@ func TestMultiUserIsolationAndCRUD(t *testing.T) {
 	}
 
 	service1.Notes = "updated notes"
+	service1.Protocol = domain.ServiceProtocolHTTPS
+	service1.AllowInsecureTLS = true
 	service1.UpdatedAt = now.Add(time.Minute)
 	if err := serviceRepo.Update(ctx, service1); err != nil {
 		t.Fatalf("Update(service) error = %v", err)
 	}
 	gotSvc, err := serviceRepo.GetByID(ctx, alice.ID, service1.ID)
-	if err != nil || gotSvc.Notes != "updated notes" {
+	if err != nil || gotSvc.Notes != "updated notes" || !gotSvc.AllowInsecureTLS {
 		t.Fatalf("GetByID(service) = (%+v, %v)", gotSvc, err)
 	}
 	if err := serviceRepo.Delete(ctx, alice.ID, service1.ID); err != nil {

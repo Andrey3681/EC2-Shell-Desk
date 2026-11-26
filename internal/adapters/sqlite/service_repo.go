@@ -24,8 +24,13 @@ func (r *ServiceRepository) Create(ctx context.Context, service domain.PrivateSe
 	const query = `
 		INSERT INTO private_services (
 			id, owner_user_id, host_id, name, preset, protocol, remote_host, remote_port,
-			base_path, local_port, health_path, open_mode, notes, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			base_path, local_port, health_path, open_mode, allow_insecure_tls, notes, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+	allowInsecure := 0
+	if service.AllowInsecureTLS {
+		allowInsecure = 1
+	}
 
 	_, err := r.db.ExecContext(
 		ctx,
@@ -42,6 +47,7 @@ func (r *ServiceRepository) Create(ctx context.Context, service domain.PrivateSe
 		service.LocalPort,
 		service.HealthPath,
 		string(service.OpenMode),
+		allowInsecure,
 		service.Notes,
 		formatTime(service.CreatedAt),
 		formatTime(service.UpdatedAt),
@@ -59,7 +65,7 @@ func (r *ServiceRepository) Create(ctx context.Context, service domain.PrivateSe
 func (r *ServiceRepository) GetByID(ctx context.Context, ownerUserID, serviceID string) (domain.PrivateService, error) {
 	const query = `
 		SELECT id, owner_user_id, host_id, name, preset, protocol, remote_host, remote_port,
-		       base_path, local_port, health_path, open_mode, notes, created_at, updated_at
+		       base_path, local_port, health_path, open_mode, allow_insecure_tls, notes, created_at, updated_at
 		FROM private_services
 		WHERE id = ? AND owner_user_id = ?`
 
@@ -77,7 +83,7 @@ func (r *ServiceRepository) GetByID(ctx context.Context, ownerUserID, serviceID 
 func (r *ServiceRepository) ListByUser(ctx context.Context, ownerUserID string) ([]domain.PrivateService, error) {
 	const query = `
 		SELECT id, owner_user_id, host_id, name, preset, protocol, remote_host, remote_port,
-		       base_path, local_port, health_path, open_mode, notes, created_at, updated_at
+		       base_path, local_port, health_path, open_mode, allow_insecure_tls, notes, created_at, updated_at
 		FROM private_services
 		WHERE owner_user_id = ?
 		ORDER BY name COLLATE NOCASE ASC`
@@ -108,7 +114,7 @@ func (r *ServiceRepository) ListByUser(ctx context.Context, ownerUserID string) 
 func (r *ServiceRepository) ListByHost(ctx context.Context, ownerUserID, hostID string) ([]domain.PrivateService, error) {
 	const query = `
 		SELECT id, owner_user_id, host_id, name, preset, protocol, remote_host, remote_port,
-		       base_path, local_port, health_path, open_mode, notes, created_at, updated_at
+		       base_path, local_port, health_path, open_mode, allow_insecure_tls, notes, created_at, updated_at
 		FROM private_services
 		WHERE owner_user_id = ? AND host_id = ?
 		ORDER BY name COLLATE NOCASE ASC`
@@ -140,8 +146,13 @@ func (r *ServiceRepository) Update(ctx context.Context, service domain.PrivateSe
 	const query = `
 		UPDATE private_services
 		SET host_id = ?, name = ?, preset = ?, protocol = ?, remote_host = ?, remote_port = ?,
-		    base_path = ?, local_port = ?, health_path = ?, open_mode = ?, notes = ?, updated_at = ?
+		    base_path = ?, local_port = ?, health_path = ?, open_mode = ?, allow_insecure_tls = ?, notes = ?, updated_at = ?
 		WHERE id = ? AND owner_user_id = ?`
+
+	allowInsecure := 0
+	if service.AllowInsecureTLS {
+		allowInsecure = 1
+	}
 
 	res, err := r.db.ExecContext(
 		ctx,
@@ -156,6 +167,7 @@ func (r *ServiceRepository) Update(ctx context.Context, service domain.PrivateSe
 		service.LocalPort,
 		service.HealthPath,
 		string(service.OpenMode),
+		allowInsecure,
 		service.Notes,
 		formatTime(service.UpdatedAt),
 		service.ID,
@@ -206,12 +218,13 @@ func (r *ServiceRepository) CountByHost(ctx context.Context, ownerUserID, hostID
 
 func scanServiceRow(scanner rowScanner) (domain.PrivateService, error) {
 	var (
-		s         domain.PrivateService
-		preset    string
-		protocol  string
-		openMode  string
-		createdAt string
-		updatedAt string
+		s             domain.PrivateService
+		preset        string
+		protocol      string
+		openMode      string
+		allowInsecure int
+		createdAt     string
+		updatedAt     string
 	)
 	if err := scanner.Scan(
 		&s.ID,
@@ -226,6 +239,7 @@ func scanServiceRow(scanner rowScanner) (domain.PrivateService, error) {
 		&s.LocalPort,
 		&s.HealthPath,
 		&openMode,
+		&allowInsecure,
 		&s.Notes,
 		&createdAt,
 		&updatedAt,
@@ -235,6 +249,7 @@ func scanServiceRow(scanner rowScanner) (domain.PrivateService, error) {
 	s.Preset = domain.ServicePreset(preset)
 	s.Protocol = domain.ServiceProtocol(protocol)
 	s.OpenMode = domain.ServiceOpenMode(openMode)
+	s.AllowInsecureTLS = allowInsecure == 1
 
 	var err error
 	if s.CreatedAt, err = parseTime(createdAt); err != nil {
