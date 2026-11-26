@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -13,7 +14,10 @@ import (
 	"ec2-shell-desk/internal/core/ports"
 )
 
-const progressEmitInterval = 50 * time.Millisecond
+const (
+	progressEmitInterval      = 50 * time.Millisecond
+	defaultMaxTransferHistory = 100
+)
 
 // TransferEventSink receives throttled SFTP transfer progress and completion notifications.
 type TransferEventSink interface {
@@ -33,8 +37,9 @@ type TransferService struct {
 	localFS  ports.LocalFileSystem
 	sink     TransferEventSink
 
-	mu        sync.RWMutex
-	transfers map[string]*managedTransfer
+	mu         sync.RWMutex
+	maxHistory int
+	transfers  map[string]*managedTransfer
 }
 
 // NewTransferService constructs a TransferService wired to auth, active sessions, local FS, and event sink.
@@ -45,12 +50,24 @@ func NewTransferService(
 	sink TransferEventSink,
 ) *TransferService {
 	return &TransferService{
-		auth:      auth,
-		sessions:  sessions,
-		localFS:   localFS,
-		sink:      sink,
-		transfers: make(map[string]*managedTransfer),
+		auth:       auth,
+		sessions:   sessions,
+		localFS:    localFS,
+		sink:       sink,
+		maxHistory: defaultMaxTransferHistory,
+		transfers:  make(map[string]*managedTransfer),
 	}
+}
+
+// SetMaxHistory overrides the maximum number of finished transfer tasks retained in memory.
+func (s *TransferService) SetMaxHistory(limit int) {
+	if limit <= 0 {
+		return
+	}
+	s.mu.Lock()
+	s.maxHistory = limit
+	s.pruneFinishedLocked()
+	s.mu.Unlock()
 }
 
 // LocalHomeDir returns the local user's home directory when authenticated.
@@ -217,7 +234,7 @@ func (s *TransferService) CancelTransfer(transferID string) error {
 	return nil
 }
 
-// ListTransfers returns all tracked transfer tasks belonging to the authenticated user.
+// ListTransfers returns tracked transfer tasks belonging to the authenticated user sorted by start time.
 func (s *TransferService) ListTransfers() ([]domain.TransferTask, error) {
 	user, err := s.auth.CurrentUser()
 	if err != nil {
@@ -233,17 +250,26 @@ func (s *TransferService) ListTransfers() ([]domain.TransferTask, error) {
 			result = append(result, mt.task)
 		}
 	}
+	sort.Slice(result, func(i, j int) bool {
+		if !result[i].StartedAt.Equal(result[j].StartedAt) {
+			return result[i].StartedAt.Before(result[j].StartedAt)
+		}
+		return result[i].ID < result[j].ID
+	})
 	return result, nil
 }
 
-// CloseAll cancels all active file transfers (typically on vault lock or shutdown).
+// CloseAll cancels all active file transfers and clears finished transfer history from memory.
 func (s *TransferService) CloseAll() {
-	s.mu.RLock()
+	s.mu.Lock()
 	cancels := make([]context.CancelFunc, 0, len(s.transfers))
-	for _, mt := range s.transfers {
+	for id, mt := range s.transfers {
 		cancels = append(cancels, mt.cancel)
+		if mt.task.State != domain.TransferRunning && mt.task.State != domain.TransferPending {
+			delete(s.transfers, id)
+		}
 	}
-	s.mu.RUnlock()
+	s.mu.Unlock()
 
 	for _, cancel := range cancels {
 		cancel()
@@ -338,9 +364,50 @@ func (s *TransferService) runTransfer(ctx context.Context, entry *managedTransfe
 		entry.task.ErrorMessage = transferErr.Error()
 	}
 	finalSnapshot := entry.task
+	s.pruneFinishedLocked()
 	s.mu.Unlock()
 
 	s.emitProgress(finalSnapshot)
+}
+
+func (s *TransferService) pruneFinishedLocked() {
+	limit := s.maxHistory
+	if limit <= 0 {
+		limit = defaultMaxTransferHistory
+	}
+
+	type finishedItem struct {
+		id         string
+		finishedAt time.Time
+	}
+
+	finished := make([]finishedItem, 0)
+	for id, mt := range s.transfers {
+		if mt.task.State == domain.TransferRunning || mt.task.State == domain.TransferPending {
+			continue
+		}
+		ts := mt.task.StartedAt
+		if mt.task.CompletedAt != nil {
+			ts = *mt.task.CompletedAt
+		}
+		finished = append(finished, finishedItem{id: id, finishedAt: ts})
+	}
+
+	if len(finished) <= limit {
+		return
+	}
+
+	sort.Slice(finished, func(i, j int) bool {
+		if !finished[i].finishedAt.Equal(finished[j].finishedAt) {
+			return finished[i].finishedAt.Before(finished[j].finishedAt)
+		}
+		return finished[i].id < finished[j].id
+	})
+
+	excess := len(finished) - limit
+	for i := 0; i < excess; i++ {
+		delete(s.transfers, finished[i].id)
+	}
 }
 
 func (s *TransferService) emitProgress(task domain.TransferTask) {

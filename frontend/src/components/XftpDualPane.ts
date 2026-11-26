@@ -125,11 +125,25 @@ export class XftpDualPane {
 
     this.unsubProgress = desktopApi.sftp.onProgress((task) => {
       this.transfers.set(task.id, task);
+      this.pruneFinishedTransfers(50);
       this.renderQueue();
       if (task.state === "completed") {
         void this.refreshBoth();
       }
     });
+  }
+
+  private pruneFinishedTransfers(maxFinished: number): void {
+    const finishedIds: string[] = [];
+    for (const [id, item] of this.transfers) {
+      if (item.state !== "running" && item.state !== "pending") {
+        finishedIds.push(id);
+      }
+    }
+    const excess = finishedIds.length - maxFinished;
+    for (let i = 0; i < excess; i++) {
+      this.transfers.delete(finishedIds[i]);
+    }
   }
 
   public async setSession(sessionId: string, contextLabel = ""): Promise<void> {

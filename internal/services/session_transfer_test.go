@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -406,6 +407,27 @@ func TestSessionTOFUSSHAndSFTPEndToEnd(t *testing.T) {
 	waitTransferDone(t, transferSink, dirTask.ID, domain.TransferCompleted)
 	if gotConf, err := os.ReadFile(filepath.Join(remoteRoot, "bundle", "nested", "app.conf")); err != nil || string(gotConf) != "port=8080" {
 		t.Fatalf("remote nested conf = (%q, %v)", string(gotConf), err)
+	}
+
+	// 3c. Bounded transfer history pruning retains only the most recent finished transfers.
+	transferSvc.SetMaxHistory(2)
+	for i := 0; i < 3; i++ {
+		f := filepath.Join(localRoot, fmt.Sprintf("prune-%d.txt", i))
+		if err := os.WriteFile(f, []byte("ok"), 0o600); err != nil {
+			t.Fatalf("write prune file: %v", err)
+		}
+		tTask, err := transferSvc.StartUpload(sess.SessionID, f, fmt.Sprintf("prune-%d.txt", i))
+		if err != nil {
+			t.Fatalf("StartUpload(prune-%d): %v", i, err)
+		}
+		waitTransferDone(t, transferSink, tTask.ID, domain.TransferCompleted)
+	}
+	tracked, err := transferSvc.ListTransfers()
+	if err != nil {
+		t.Fatalf("ListTransfers(): %v", err)
+	}
+	if len(tracked) != 2 {
+		t.Fatalf("ListTransfers() length = %d, want 2 after history pruning", len(tracked))
 	}
 
 	// 4. Multi-user isolation: Bob logs in and cannot access Alice's session or transfer.
