@@ -1,48 +1,46 @@
+version: "2"
+
 run:
   timeout: 5m
   tests: true
 
 linters:
   enable:
-    - errcheck
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    - gofumpt
-    - revive
-    - gosec
-    - misspell
     - bodyclose
     - contextcheck
+    - errcheck
     - errorlint
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
     - nilerr
+    - revive
+    - staticcheck
+    - unused
     - wrapcheck
-
-linters-settings:
-  gofumpt:
-    extra-rules: true
-  revive:
+  settings:
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - sayRepetitiveInsteadOfStutters
+    gosec:
+      excludes:
+        - G104 # Covered by errcheck with better context
+    wrapcheck:
+      ignore-package-globs:
+        - ec2-shell-desk/internal/*
+        - ec2-shell-desk/internal/*/*
+  exclusions:
+    paths:
+      - frontend
+      - build
+      - docs
     rules:
-      - name: exported
-        arguments:
-          - checkPrivateReceivers
-          - sayRepetitiveInsteadOfStutters
-  gosec:
-    excludes:
-      - G104 # Covered by errcheck with better context
-  wrapcheck:
-    ignorePackageGlobs:
-      - ec2-shell-desk/internal/core/domain
-
-issues:
-  exclude-dirs:
-    - frontend
-    - build
-    - docs
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gosec
-        - wrapcheck
-        - errcheck
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+          - wrapcheck

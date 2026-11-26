@@ -21,7 +21,7 @@ tasks:
       - task: setup-frontend
       - go install github.com/wailsapp/wails/v2/cmd/wails@latest
       - go install mvdan.cc/gofumpt@latest
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
       - go install github.com/princjef/gomarkdoc/cmd/gomarkdoc@latest
 
   dev:
