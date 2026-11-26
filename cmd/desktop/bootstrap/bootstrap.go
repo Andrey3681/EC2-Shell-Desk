@@ -59,7 +59,7 @@ func Run(assets fs.FS) error {
 
 	authSvc := services.NewAuthService(userRepo, vaultCrypto, vaultCrypto)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vaultCrypto, vaultCrypto)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, tunnelRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, tunnelRepo, serviceRepo)
 	sessionSvc := services.NewSessionService(authSvc, hostRepo, knownRepo, vaultSvc, sshManager, bridge)
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, localFS, bridge)
 	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshManager, bridge)

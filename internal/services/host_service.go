@@ -27,27 +27,30 @@ type SaveHostInput struct {
 
 // HostService manages EC2 and Linux host instances and user-defined groups isolated per authenticated user.
 type HostService struct {
-	auth    *AuthService
-	hosts   ports.HostRepository
-	keys    ports.KeyRepository
-	groups  ports.HostGroupRepository
-	tunnels ports.TunnelRepository
+	auth     *AuthService
+	hosts    ports.HostRepository
+	keys     ports.KeyRepository
+	groups   ports.HostGroupRepository
+	tunnels  ports.TunnelRepository
+	services ports.ServiceRepository
 }
 
-// NewHostService constructs a HostService with active session, host, key, group, and optional tunnel repositories.
+// NewHostService constructs a HostService with active session, host, key, group, and optional tunnel and service repositories.
 func NewHostService(
 	auth *AuthService,
 	hosts ports.HostRepository,
 	keys ports.KeyRepository,
 	groups ports.HostGroupRepository,
 	tunnels ports.TunnelRepository,
+	services ports.ServiceRepository,
 ) *HostService {
 	return &HostService{
-		auth:    auth,
-		hosts:   hosts,
-		keys:    keys,
-		groups:  groups,
-		tunnels: tunnels,
+		auth:     auth,
+		hosts:    hosts,
+		keys:     keys,
+		groups:   groups,
+		tunnels:  tunnels,
+		services: services,
 	}
 }
 
@@ -152,7 +155,7 @@ func (s *HostService) UpdateHost(ctx context.Context, input SaveHostInput) (doma
 	return updated, nil
 }
 
-// DeleteHost deletes a HostInstance owned by the currently authenticated user unless tunnels reference it.
+// DeleteHost deletes a HostInstance owned by the currently authenticated user unless tunnels or private services reference it.
 func (s *HostService) DeleteHost(ctx context.Context, hostID string) error {
 	if strings.TrimSpace(hostID) == "" {
 		return fmt.Errorf("%w: host id is required", domain.ErrInvalidInput)
@@ -170,6 +173,16 @@ func (s *HostService) DeleteHost(ctx context.Context, hostID string) error {
 		}
 		if refs > 0 {
 			return fmt.Errorf("%w: referenced by %d tunnel(s)", domain.ErrHostInUse, refs)
+		}
+	}
+
+	if s.services != nil {
+		svcRefs, svcErr := s.services.CountByHost(ctx, user.ID, hostID)
+		if svcErr != nil {
+			return fmt.Errorf("check host private service references: %w", svcErr)
+		}
+		if svcRefs > 0 {
+			return fmt.Errorf("%w: referenced by %d private service(s)", domain.ErrHostInUse, svcRefs)
 		}
 	}
 
