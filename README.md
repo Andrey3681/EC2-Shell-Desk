@@ -5,7 +5,7 @@
 Aplicación de escritorio nativa y liviana para **Windows** escrita en **Go + Wails v2**, inspirada en **Xshell + Xftp**, enfocada en simplificar la conexión **SSH** y la transferencia de archivos **SFTP** hacia **instancias AWS EC2 y servidores Linux**.
 
 > [!NOTE]
-> **Estado del Proyecto:** Fases 0 a 4 implementadas y compiladas para Windows (`ec2-shell-desk.exe`). Pendiente validación manual contra instancia AWS EC2 real según [`docs/verificacion.md`](docs/verificacion.md) y [`docs/TODO.md`](docs/TODO.md).
+> **Estado del Proyecto:** Todas las fases implementadas, verificadas en Windows contra instancias AWS EC2 reales y compiladas (`ec2-shell-desk.exe`). Consulta el detalle en [`docs/TODO.md`](docs/TODO.md) y [`CHANGELOG.md`](CHANGELOG.md).
 
 Repositorio oficial: [Andrey3681/EC2-Shell-Desk](https://github.com/Andrey3681/EC2-Shell-Desk)
 

@@ -36,7 +36,7 @@
 - [x] Conectar bindings Wails en `internal/app/*_handler.go` y DI en `cmd/desktop/main.go`
 - [x] Implementar UI en `frontend/` (Login/Bootstrap, Sidebar Instancias + Bóveda `.pem`, Terminal Tabs `xterm.js`, SFTP Dual-Pane)
 - [x] Soporte bilingüe en `frontend/src/i18n/` (`es` / `en`)
-- [ ] Validar prueba manual en Windows contra una instancia EC2 real (`docs/verificacion.md`)
+- [x] Validar prueba manual en Windows contra una instancia EC2 real (`docs/verificacion.md`)
 - [x] Compilar `.exe` portátil (`task build`) (instalador NSIS opcional con `task build-installer` si NSIS está instalado)
 
 ## Fase 5 — Evolución Operativa y Hardening
