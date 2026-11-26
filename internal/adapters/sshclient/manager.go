@@ -128,7 +128,7 @@ func (m *Manager) ConnectPTY(ctx context.Context, req ports.SSHConnectRequest) (
 		return nil, fmt.Errorf("start remote shell: %w", err)
 	}
 
-	sessionCtx, cancelKeepalive := context.WithCancel(context.Background())
+	sessionCtx, cancelKeepalive := context.WithCancel(context.WithoutCancel(ctx))
 	pty := &ptySession{
 		id:         uuid.NewString(),
 		client:     client,

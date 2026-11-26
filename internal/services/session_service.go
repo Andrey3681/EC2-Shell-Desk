@@ -111,7 +111,7 @@ func (s *SessionService) OpenSession(
 	now := time.Now().UTC()
 	_ = s.hosts.TouchLastConnected(ctx, user.ID, host.ID, now)
 
-	streamCtx, cancelStream := context.WithCancel(context.Background())
+	streamCtx, cancelStream := context.WithCancel(context.WithoutCancel(ctx))
 	info := domain.SessionInfo{
 		SessionID:   pty.ID(),
 		OwnerUserID: user.ID,

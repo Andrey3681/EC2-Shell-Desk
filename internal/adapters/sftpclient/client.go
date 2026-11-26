@@ -94,6 +94,7 @@ func (c *Client) Upload(ctx context.Context, localPath, remotePath string, onPro
 		return err
 	}
 
+	// #nosec G304 -- cleanLocal is sanitized and chosen by the authenticated local desktop user.
 	src, err := os.Open(cleanLocal)
 	if err != nil {
 		return fmt.Errorf("open local file for upload: %w", err)
@@ -238,6 +239,7 @@ func (c *Client) uploadSingleInDir(
 	totalBytes int64,
 	onProgress ports.TransferProgressFunc,
 ) error {
+	// #nosec G304 -- f.localPath comes from sanitized filepath.WalkDir under a user-selected directory.
 	src, err := os.Open(f.localPath)
 	if err != nil {
 		return fmt.Errorf("open local file %q: %w", f.localPath, err)
@@ -302,6 +304,7 @@ func (c *Client) Download(ctx context.Context, remotePath, localPath string, onP
 		return fmt.Errorf("create local parent directory: %w", mkErr)
 	}
 
+	// #nosec G304 -- cleanLocal is sanitized and chosen by the authenticated local desktop user.
 	dst, err := os.Create(cleanLocal)
 	if err != nil {
 		return fmt.Errorf("create local file %q: %w", cleanLocal, err)

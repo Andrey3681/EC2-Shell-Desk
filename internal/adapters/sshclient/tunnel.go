@@ -49,7 +49,7 @@ func (m *Manager) StartLocalForward(ctx context.Context, req ports.TunnelForward
 		return nil, fmt.Errorf("listen on local tunnel address %s: %w", bindAddr, err)
 	}
 
-	tunnelCtx, cancel := context.WithCancel(context.Background())
+	tunnelCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	handle := &tunnelHandle{
 		id:         uuid.NewString(),
 		localAddr:  listener.Addr().String(),
@@ -93,32 +93,39 @@ type tunnelHandle struct {
 	wg      sync.WaitGroup
 }
 
+// ID returns the unique identifier of this active port-forwarding tunnel.
 func (t *tunnelHandle) ID() string {
 	return t.id
 }
 
+// LocalAddr returns the bound local host:port listener address.
 func (t *tunnelHandle) LocalAddr() string {
 	return t.localAddr
 }
 
+// ActiveConnections returns the number of currently open forwarded TCP connections.
 func (t *tunnelHandle) ActiveConnections() int {
 	return int(t.activeConns.Load())
 }
 
+// BytesTransferred returns cumulative inbound and outbound bytes forwarded through this tunnel.
 func (t *tunnelHandle) BytesTransferred() (int64, int64) {
 	return t.bytesIn.Load(), t.bytesOut.Load()
 }
 
+// Done returns a channel that is closed once the tunnel listener and SSH client have shut down.
 func (t *tunnelHandle) Done() <-chan struct{} {
 	return t.done
 }
 
+// Err returns the first terminal error encountered by the tunnel, if any.
 func (t *tunnelHandle) Err() error {
 	t.errMu.Lock()
 	defer t.errMu.Unlock()
 	return t.lastErr
 }
 
+// Close stops accepting connections, closes active forwarded sockets and the SSH client, and waits for goroutines.
 func (t *tunnelHandle) Close() error {
 	var closeErr error
 	t.closeOnce.Do(func() {

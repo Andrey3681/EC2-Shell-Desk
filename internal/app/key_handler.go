@@ -45,6 +45,7 @@ func (h *KeyHandler) ImportKeyFromFile(name, filePath, passphrase string) (domai
 		return domain.SSHKeySummary{}, fmt.Errorf("%w: file path is required", domain.ErrInvalidInput)
 	}
 
+	// #nosec G304 -- filePath is explicitly chosen by the local desktop user via native file dialog.
 	rawBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return domain.SSHKeySummary{}, fmt.Errorf("read key file: %w", err)

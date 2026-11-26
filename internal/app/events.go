@@ -124,6 +124,8 @@ func (b *EventBridge) OnServiceStatusChanged(status domain.ServiceRuntimeStatus)
 }
 
 // RequestTOFUTrust emits a host key fingerprint prompt to the UI and waits for the user's decision.
+//
+//nolint:contextcheck // Wails runtime.EventsEmit requires the bound Wails runtime context rather than the caller dial context.
 func (b *EventBridge) RequestTOFUTrust(ctx context.Context, challenge ports.HostKeyChallenge) (bool, error) {
 	b.mu.RLock()
 	rtCtx := b.ctx
