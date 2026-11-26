@@ -60,7 +60,7 @@ func TestObservabilityServiceLifecycleHealthAndIsolation(t *testing.T) {
 
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, nil)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, nil, serviceRepo)
 
 	sink := &spyServiceSink{}
 	sshMgr := sshclient.NewManager(nil, sshclient.WithDialTimeout(5*time.Second))
@@ -175,7 +175,15 @@ func TestObservabilityServiceLifecycleHealthAndIsolation(t *testing.T) {
 	if err := obsSvc.StopService(created.ID); err != nil {
 		t.Fatalf("StopService: %v", err)
 	}
+	// Deleting the host while a private service still references it must return ErrHostInUse.
+	if err := hostSvc.DeleteHost(ctx, host.ID); !errors.Is(err, domain.ErrHostInUse) {
+		t.Fatalf("DeleteHost(with private service) = %v, want ErrHostInUse", err)
+	}
 	if err := obsSvc.DeleteService(ctx, created.ID); err != nil {
 		t.Fatalf("DeleteService: %v", err)
+	}
+	// Once the private service is removed, DeleteHost succeeds cleanly.
+	if err := hostSvc.DeleteHost(ctx, host.ID); err != nil {
+		t.Fatalf("DeleteHost(after service deleted) error = %v", err)
 	}
 }

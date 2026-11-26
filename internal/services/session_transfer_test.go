@@ -287,7 +287,7 @@ func TestSessionTOFUSSHAndSFTPEndToEnd(t *testing.T) {
 
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, nil, tunnelRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, nil, tunnelRepo, nil)
 
 	termSink := newSpyTerminalSink()
 	transferSink := newSpyTransferSink()

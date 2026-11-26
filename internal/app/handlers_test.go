@@ -67,7 +67,7 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	sshMgr := sshclient.NewManager(sftpclient.NewFromSSHClient)
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, tunnelRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, tunnelRepo, serviceRepo)
 	sessionSvc := services.NewSessionService(authSvc, hostRepo, knownRepo, vaultSvc, sshMgr, bridge)
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, winfs.NewWinFS(), bridge)
 	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshMgr, bridge)

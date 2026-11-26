@@ -70,7 +70,7 @@ func TestTunnelServiceEndToEndAndMultiUserIsolation(t *testing.T) {
 
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, nil, tunnelRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, nil, tunnelRepo, nil)
 	tunnelSink := &spyTunnelSink{}
 
 	sshMgr := sshclient.NewManager(nil, sshclient.WithDialTimeout(5*time.Second))

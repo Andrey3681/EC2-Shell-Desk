@@ -70,10 +70,11 @@ func setupPhase2Stack(t *testing.T) (string, *services.AuthService, *services.Va
 	hostRepo := sqlite.NewHostRepository(store)
 	groupRepo := sqlite.NewGroupRepository(store)
 	tunnelRepo := sqlite.NewTunnelRepository(store)
+	serviceRepo := sqlite.NewServiceRepository(store)
 
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, tunnelRepo)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, tunnelRepo, serviceRepo)
 
 	return dbPath, authSvc, vaultSvc, hostSvc
 }

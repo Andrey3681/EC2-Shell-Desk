@@ -34,7 +34,7 @@ func TestSnippetServiceCRUDExecutionAndIsolation(t *testing.T) {
 
 	authSvc := services.NewAuthService(userRepo, vc, vc)
 	vaultSvc := services.NewVaultService(authSvc, keyRepo, vc, vc)
-	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, nil)
+	hostSvc := services.NewHostService(authSvc, hostRepo, keyRepo, groupRepo, nil, nil)
 
 	termSink := newSpyTerminalSink()
 	sshMgr := sshclient.NewManager(nil, sshclient.WithDialTimeout(5*time.Second))
