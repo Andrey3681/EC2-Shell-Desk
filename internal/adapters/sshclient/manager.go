@@ -54,6 +54,9 @@ type Manager struct {
 	dialTimeout       time.Duration
 	keepaliveInterval time.Duration
 	sftpOpener        SFTPOpener
+
+	tunnelPoolMu sync.Mutex
+	tunnelPool   map[string]*pooledTunnelClient
 }
 
 // NewManager constructs an SSH session manager with optional SFTP opener and timing options.
@@ -62,6 +65,7 @@ func NewManager(sftpOpener SFTPOpener, opts ...Option) *Manager {
 		dialTimeout:       defaultDialTimeout,
 		keepaliveInterval: defaultKeepaliveInterval,
 		sftpOpener:        sftpOpener,
+		tunnelPool:        make(map[string]*pooledTunnelClient),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -73,7 +77,7 @@ func NewManager(sftpOpener SFTPOpener, opts ...Option) *Manager {
 
 // ConnectPTY establishes an authenticated SSH connection with TOFU verification and starts an interactive PTY shell.
 func (m *Manager) ConnectPTY(ctx context.Context, req ports.SSHConnectRequest) (ports.PTYSession, error) {
-	client, err := m.dialSSHClient(ctx, req.Host, req.PrivateKeyPEM, req.Passphrase, req.Password, req.VerifyHostKey)
+	client, _, err := m.dialSSHClient(ctx, req.Host, req.PrivateKeyPEM, req.Passphrase, req.Password, req.VerifyHostKey)
 	if err != nil {
 		return nil, err
 	}
@@ -150,16 +154,17 @@ func (m *Manager) dialSSHClient(
 	privateKeyPEM, passphrase []byte,
 	password string,
 	verifyHostKey ports.HostKeyVerifier,
-) (*ssh.Client, error) {
+) (*ssh.Client, ports.HostKeyChallenge, error) {
 	if verifyHostKey == nil {
-		return nil, fmt.Errorf("%w: host key verifier callback is required", domain.ErrInvalidInput)
+		return nil, ports.HostKeyChallenge{}, fmt.Errorf("%w: host key verifier callback is required", domain.ErrInvalidInput)
 	}
 
 	authMethods, err := buildAuthMethods(privateKeyPEM, passphrase, password)
 	if err != nil {
-		return nil, err
+		return nil, ports.HostKeyChallenge{}, err
 	}
 
+	var capturedChallenge ports.HostKeyChallenge
 	hostPort := net.JoinHostPort(host.HostAddress, strconv.Itoa(host.Port))
 	sshCfg := &ssh.ClientConfig{
 		User:    host.SSHUsername,
@@ -173,6 +178,7 @@ func (m *Manager) dialSSHClient(
 				Fingerprint:   ssh.FingerprintSHA256(key),
 				PublicKeyBlob: key.Marshal(),
 			}
+			capturedChallenge = challenge
 			return verifyHostKey(ctx, challenge)
 		},
 	}
@@ -183,7 +189,7 @@ func (m *Manager) dialSSHClient(
 	dialer := &net.Dialer{Timeout: m.dialTimeout}
 	netConn, err := dialer.DialContext(dialCtx, "tcp", hostPort)
 	if err != nil {
-		return nil, fmt.Errorf("dial ssh host %s: %w", hostPort, err)
+		return nil, ports.HostKeyChallenge{}, fmt.Errorf("dial ssh host %s: %w", hostPort, err)
 	}
 
 	// Abort handshake immediately if caller cancels context mid-handshake.
@@ -200,10 +206,10 @@ func (m *Manager) dialSSHClient(
 	close(handshakeDone)
 	if err != nil {
 		_ = netConn.Close()
-		return nil, fmt.Errorf("ssh handshake with %s: %w", hostPort, err)
+		return nil, ports.HostKeyChallenge{}, fmt.Errorf("ssh handshake with %s: %w", hostPort, err)
 	}
 
-	return ssh.NewClient(sshConn, chans, reqs), nil
+	return ssh.NewClient(sshConn, chans, reqs), capturedChallenge, nil
 }
 
 func buildAuthMethods(rawPEM, passphrase []byte, password string) ([]ssh.AuthMethod, error) {

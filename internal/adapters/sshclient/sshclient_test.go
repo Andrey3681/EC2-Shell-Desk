@@ -24,12 +24,19 @@ import (
 )
 
 type testSSHServer struct {
-	host        string
-	port        int
-	fingerprint string
-	listener    net.Listener
-	mu          sync.Mutex
-	lastResize  [2]int // cols, rows
+	host         string
+	port         int
+	fingerprint  string
+	listener     net.Listener
+	mu           sync.Mutex
+	lastResize   [2]int // cols, rows
+	sshConnCount int
+}
+
+func (s *testSSHServer) connectionCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sshConnCount
 }
 
 func startEmbeddedSSHServer(t *testing.T, authorizedPub ssh.PublicKey) *testSSHServer {
@@ -91,6 +98,9 @@ func (s *testSSHServer) handleConn(netConn net.Conn, cfg *ssh.ServerConfig) {
 	if err != nil {
 		return
 	}
+	s.mu.Lock()
+	s.sshConnCount++
+	s.mu.Unlock()
 	go ssh.DiscardRequests(reqs)
 
 	for newCh := range chans {
@@ -427,5 +437,100 @@ func TestStartLocalForwardEndToEndAndBusyPort(t *testing.T) {
 	case <-handle.Done():
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for tunnel Done channel")
+	}
+}
+
+func TestStartLocalForwardMultiplexesSharedSSHConnection(t *testing.T) {
+	rawKey, sshPub := generateClientKey(t, nil)
+	srv := startEmbeddedSSHServer(t, sshPub)
+
+	targetLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen target echo: %v", err)
+	}
+	t.Cleanup(func() { _ = targetLn.Close() })
+	go func() {
+		for {
+			c, aErr := targetLn.Accept()
+			if aErr != nil {
+				return
+			}
+			go func(conn net.Conn) {
+				defer func() { _ = conn.Close() }()
+				_, _ = io.Copy(conn, conn)
+			}(c)
+		}
+	}()
+	targetAddr := targetLn.Addr().(*net.TCPAddr)
+
+	mgr := sshclient.NewManager(nil, sshclient.WithDialTimeout(5*time.Second))
+	bastion := domain.HostInstance{
+		ID:          "mux-bastion",
+		OwnerUserID: "u1",
+		Alias:       "Mux EC2",
+		HostAddress: srv.host,
+		Port:        srv.port,
+		SSHUsername: "ec2-user",
+	}
+
+	req := ports.TunnelForwardRequest{
+		Host:          bastion,
+		PrivateKeyPEM: rawKey,
+		LocalHost:     "127.0.0.1",
+		LocalPort:     0,
+		RemoteHost:    targetAddr.IP.String(),
+		RemotePort:    targetAddr.Port,
+		VerifyHostKey: func(_ context.Context, _ ports.HostKeyChallenge) error { return nil },
+	}
+
+	h1, err := mgr.StartLocalForward(context.Background(), req)
+	if err != nil {
+		t.Fatalf("StartLocalForward #1 error = %v", err)
+	}
+	h2, err := mgr.StartLocalForward(context.Background(), req)
+	if err != nil {
+		_ = h1.Close()
+		t.Fatalf("StartLocalForward #2 error = %v", err)
+	}
+
+	if got := srv.connectionCount(); got != 1 {
+		_ = h1.Close()
+		_ = h2.Close()
+		t.Fatalf("expected 1 multiplexed SSH connection for 2 tunnels, got %d", got)
+	}
+
+	// Closing tunnel #1 must keep tunnel #2 alive and forwarding traffic.
+	if err := h1.Close(); err != nil {
+		t.Fatalf("h1.Close() error = %v", err)
+	}
+
+	conn, err := net.DialTimeout("tcp", h2.LocalAddr(), 2*time.Second)
+	if err != nil {
+		t.Fatalf("dial h2 after h1 closed: %v", err)
+	}
+	msg := []byte("PING-MUX")
+	if _, err := conn.Write(msg); err != nil {
+		t.Fatalf("write h2: %v", err)
+	}
+	resp := make([]byte, len(msg))
+	if _, err := io.ReadFull(conn, resp); err != nil || !bytes.Equal(resp, msg) {
+		t.Fatalf("read h2 = (%q, %v), want %q", resp, err, msg)
+	}
+	_ = conn.Close()
+
+	// Closing tunnel #2 releases the last reference and closes the shared SSH client.
+	if err := h2.Close(); err != nil {
+		t.Fatalf("h2.Close() error = %v", err)
+	}
+
+	// Opening tunnel #3 after all were closed dials a fresh SSH connection (#2).
+	h3, err := mgr.StartLocalForward(context.Background(), req)
+	if err != nil {
+		t.Fatalf("StartLocalForward #3 error = %v", err)
+	}
+	defer func() { _ = h3.Close() }()
+
+	if got := srv.connectionCount(); got != 2 {
+		t.Fatalf("expected 2 total SSH connections after pool release and re-dial, got %d", got)
 	}
 }

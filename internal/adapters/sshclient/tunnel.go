@@ -2,6 +2,8 @@ package sshclient
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -19,7 +21,34 @@ import (
 	"ec2-shell-desk/internal/core/ports"
 )
 
-// StartLocalForward establishes an SSH bastion connection and listens on a local TCP port,
+type pooledTunnelClient struct {
+	key             string
+	client          *ssh.Client
+	challenge       ports.HostKeyChallenge
+	cancelKeepalive context.CancelFunc
+	refs            int
+	dead            chan struct{}
+
+	errMu   sync.Mutex
+	waitErr error
+}
+
+func (p *pooledTunnelClient) isDead() bool {
+	select {
+	case <-p.dead:
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *pooledTunnelClient) err() error {
+	p.errMu.Lock()
+	defer p.errMu.Unlock()
+	return p.waitErr
+}
+
+// StartLocalForward establishes (or reuses a pooled) SSH bastion connection and listens on a local TCP port,
 // forwarding each connection to the target remote endpoint over the SSH tunnel.
 func (m *Manager) StartLocalForward(ctx context.Context, req ports.TunnelForwardRequest) (ports.TunnelHandle, error) {
 	if strings.TrimSpace(req.RemoteHost) == "" || req.RemotePort < 1 || req.RemotePort > 65535 {
@@ -34,7 +63,7 @@ func (m *Manager) StartLocalForward(ctx context.Context, req ports.TunnelForward
 		return nil, fmt.Errorf("%w: local port must be between 0 and 65535", domain.ErrInvalidInput)
 	}
 
-	client, err := m.dialSSHClient(ctx, req.Host, req.PrivateKeyPEM, req.Passphrase, req.Password, req.VerifyHostKey)
+	pooled, err := m.acquireTunnelClient(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +71,7 @@ func (m *Manager) StartLocalForward(ctx context.Context, req ports.TunnelForward
 	bindAddr := net.JoinHostPort(localHost, strconv.Itoa(req.LocalPort))
 	listener, err := net.Listen("tcp", bindAddr)
 	if err != nil {
-		_ = client.Close()
+		_ = m.releaseTunnelClient(pooled)
 		if isAddrInUseError(err) {
 			return nil, fmt.Errorf("%w: %s", domain.ErrLocalPortInUse, bindAddr)
 		}
@@ -54,7 +83,8 @@ func (m *Manager) StartLocalForward(ctx context.Context, req ports.TunnelForward
 		id:         uuid.NewString(),
 		localAddr:  listener.Addr().String(),
 		remoteAddr: net.JoinHostPort(strings.TrimSpace(req.RemoteHost), strconv.Itoa(req.RemotePort)),
-		client:     client,
+		pooled:     pooled,
+		release:    func() error { return m.releaseTunnelClient(pooled) },
 		listener:   listener,
 		onTraffic:  req.OnTraffic,
 		cancel:     cancel,
@@ -62,18 +92,140 @@ func (m *Manager) StartLocalForward(ctx context.Context, req ports.TunnelForward
 		conns:      make(map[net.Conn]struct{}),
 	}
 
-	go runSSHKeepalive(tunnelCtx, client, m.keepaliveInterval)
 	go handle.watchSSHClose(tunnelCtx)
 	go handle.acceptLoop(tunnelCtx)
 
 	return handle, nil
 }
 
+func (m *Manager) acquireTunnelClient(ctx context.Context, req ports.TunnelForwardRequest) (*pooledTunnelClient, error) {
+	if req.VerifyHostKey == nil {
+		return nil, fmt.Errorf("%w: host key verifier callback is required", domain.ErrInvalidInput)
+	}
+
+	key := buildTunnelPoolKey(req)
+
+	m.tunnelPoolMu.Lock()
+	existing := m.tunnelPool[key]
+	if existing != nil && !existing.isDead() {
+		existing.refs++
+		m.tunnelPoolMu.Unlock()
+
+		// Enforce host key verification even on pooled reuse so revoked known_hosts are respected.
+		if err := req.VerifyHostKey(ctx, existing.challenge); err != nil {
+			_ = m.releaseTunnelClient(existing)
+			return nil, err
+		}
+		return existing, nil
+	}
+	m.tunnelPoolMu.Unlock()
+
+	client, challenge, err := m.dialSSHClient(ctx, req.Host, req.PrivateKeyPEM, req.Passphrase, req.Password, req.VerifyHostKey)
+	if err != nil {
+		return nil, err
+	}
+
+	keepaliveCtx, cancelKeepalive := context.WithCancel(context.WithoutCancel(ctx))
+	pc := &pooledTunnelClient{
+		key:             key,
+		client:          client,
+		challenge:       challenge,
+		cancelKeepalive: cancelKeepalive,
+		refs:            1,
+		dead:            make(chan struct{}),
+	}
+
+	m.tunnelPoolMu.Lock()
+	if raced := m.tunnelPool[key]; raced != nil && !raced.isDead() {
+		raced.refs++
+		m.tunnelPoolMu.Unlock()
+		cancelKeepalive()
+		_ = client.Close()
+		return raced, nil
+	}
+	m.tunnelPool[key] = pc
+	m.tunnelPoolMu.Unlock()
+
+	go runSSHKeepalive(keepaliveCtx, client, m.keepaliveInterval)
+	go m.watchPooledClient(pc)
+
+	return pc, nil
+}
+
+func (m *Manager) watchPooledClient(pc *pooledTunnelClient) {
+	waitErr := pc.client.Wait()
+	pc.errMu.Lock()
+	pc.waitErr = waitErr
+	pc.errMu.Unlock()
+
+	pc.cancelKeepalive()
+	close(pc.dead)
+
+	m.tunnelPoolMu.Lock()
+	if m.tunnelPool[pc.key] == pc {
+		delete(m.tunnelPool, pc.key)
+	}
+	m.tunnelPoolMu.Unlock()
+}
+
+func (m *Manager) releaseTunnelClient(pc *pooledTunnelClient) error {
+	if pc == nil {
+		return nil
+	}
+
+	var shouldClose bool
+	m.tunnelPoolMu.Lock()
+	if pc.refs > 0 {
+		pc.refs--
+	}
+	if pc.refs == 0 {
+		if m.tunnelPool[pc.key] == pc {
+			delete(m.tunnelPool, pc.key)
+		}
+		shouldClose = true
+	}
+	m.tunnelPoolMu.Unlock()
+
+	if !shouldClose {
+		return nil
+	}
+
+	pc.cancelKeepalive()
+	if pc.client != nil {
+		err := pc.client.Close()
+		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
+			return fmt.Errorf("close tunnel ssh client: %w", err)
+		}
+	}
+	return nil
+}
+
+func buildTunnelPoolKey(req ports.TunnelForwardRequest) string {
+	h := sha256.New()
+	_, _ = h.Write([]byte(req.Host.OwnerUserID))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(req.Host.ID))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(req.Host.HostAddress))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(strconv.Itoa(req.Host.Port)))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(req.Host.SSHUsername))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write(req.PrivateKeyPEM)
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write(req.Passphrase)
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(req.Password))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 type tunnelHandle struct {
 	id         string
 	localAddr  string
 	remoteAddr string
-	client     *ssh.Client
+	pooled     *pooledTunnelClient
+	release    func() error
 	listener   net.Listener
 	onTraffic  func(activeConns int, bytesIn, bytesOut int64)
 
@@ -125,7 +277,7 @@ func (t *tunnelHandle) Err() error {
 	return t.lastErr
 }
 
-// Close stops accepting connections, closes active forwarded sockets and the SSH client, and waits for goroutines.
+// Close stops accepting connections, closes active forwarded sockets, releases the shared SSH client, and waits for goroutines.
 func (t *tunnelHandle) Close() error {
 	var closeErr error
 	t.closeOnce.Do(func() {
@@ -140,26 +292,21 @@ func (t *tunnelHandle) Close() error {
 		}
 		t.connsMu.Unlock()
 
-		if t.client != nil {
-			err := t.client.Close()
-			if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
-				closeErr = fmt.Errorf("close tunnel ssh client: %w", err)
-			}
-		}
-
 		t.wg.Wait()
+		if t.release != nil {
+			closeErr = t.release()
+		}
 		close(t.done)
 	})
 	return closeErr
 }
 
 func (t *tunnelHandle) watchSSHClose(ctx context.Context) {
-	waitErr := t.client.Wait()
 	select {
 	case <-ctx.Done():
 		return
-	default:
-		if waitErr != nil {
+	case <-t.pooled.dead:
+		if waitErr := t.pooled.err(); waitErr != nil {
 			t.setErr(fmt.Errorf("ssh tunnel connection closed: %w", waitErr))
 		}
 		_ = t.Close()
@@ -191,7 +338,7 @@ func (t *tunnelHandle) forwardConn(ctx context.Context, localConn net.Conn) {
 	defer t.untrackConn(localConn)
 	defer func() { _ = localConn.Close() }()
 
-	remoteConn, err := t.client.Dial("tcp", t.remoteAddr)
+	remoteConn, err := t.pooled.client.Dial("tcp", t.remoteAddr)
 	if err != nil {
 		return
 	}
