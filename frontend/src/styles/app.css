@@ -466,6 +466,7 @@ textarea {
 
 /* Center Terminal + SFTP Split */
 .center-pane {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -553,14 +554,142 @@ textarea {
   color: var(--text-secondary);
 }
 
-/* Xftp Dual Pane */
+/* Xftp Modern Commander Dual Pane */
 .xftp-panel {
-  height: 320px;
+  position: relative;
+  height: 360px;
+  min-height: 220px;
+  max-height: 82vh;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.xftp-panel.xftp-mode-maximized {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: auto !important;
+  max-height: none;
+  z-index: 30;
+  border-top: none;
+}
+
+.xftp-panel.xftp-mode-floating {
+  position: fixed;
+  top: 72px;
+  left: 340px;
+  width: min(920px, 86vw);
+  height: min(560px, 78vh);
+  min-width: 620px;
+  min-height: 340px;
+  max-width: 96vw;
+  max-height: 92vh;
+  z-index: 42;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  border-radius: 10px;
+  box-shadow: 0 24px 64px rgba(2, 6, 23, 0.78);
+  resize: both;
+  overflow: hidden;
+}
+
+.xftp-splitter {
+  height: 5px;
+  cursor: ns-resize;
+  background: transparent;
   border-top: 2px solid var(--border-subtle);
+  transition: border-color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.xftp-splitter:hover,
+.xftp-splitter.active {
+  border-top-color: var(--accent-primary);
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.xftp-mode-maximized .xftp-splitter,
+.xftp-mode-floating .xftp-splitter {
+  display: none;
+}
+
+.xftp-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  background: #0b1120;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.xftp-mode-floating .xftp-topbar {
+  cursor: move;
+}
+
+.xftp-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.xftp-topbar-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.xftp-context-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 340px;
+}
+
+.xftp-mode-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.xftp-mode-btn {
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.xftp-mode-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.xftp-mode-btn.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: var(--accent-primary);
+  color: #e0f2fe;
 }
 
 .xftp-panes {
@@ -571,55 +700,284 @@ textarea {
 }
 
 .xftp-pane {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
 }
 
 .xftp-pane:last-child {
   border-right: none;
 }
 
-.xftp-toolbar {
+.xftp-pane.xftp-drag-over::after {
+  content: attr(data-drop-hint);
+  position: absolute;
+  inset: 6px;
+  border: 2px dashed var(--accent-primary);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.86);
+  color: #7dd3fc;
+  font-size: 13px;
+  font-weight: 600;
   display: flex;
   align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.xftp-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 5px 8px;
   background: #0f172a;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.65);
+}
+
+.xftp-pane-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.xftp-filter-input {
+  width: 140px;
+  padding: 2px 7px;
+  font-size: 11px;
+  border-radius: 5px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.xftp-filter-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.xftp-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  background: #0f172a;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.55);
+}
+
+.xftp-breadcrumbs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  padding: 2px 4px;
+  border-radius: 5px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  scrollbar-width: thin;
+}
+
+.xftp-crumb {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.xftp-crumb:hover {
+  background: rgba(56, 189, 248, 0.16);
+  color: #e0f2fe;
+}
+
+.xftp-crumb.current {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.xftp-crumb-sep {
+  color: #475569;
+  font-size: 10px;
+  user-select: none;
+}
+
+.xftp-actionbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 5px 8px;
+  background: rgba(15, 23, 42, 0.7);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.xftp-actionbar .btn-sm {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.xftp-sel-badge {
+  margin-left: auto;
+  font-size: 11px;
+  color: #7dd3fc;
+  font-weight: 600;
 }
 
 .xftp-table-wrap {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .xftp-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
+  user-select: none;
 }
 
-.xftp-table th,
+.xftp-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #0f172a;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .xftp-table td {
   padding: 4px 8px;
   text-align: left;
-  border-bottom: 1px solid rgba(40, 53, 72, 0.5);
+  border-bottom: 1px solid rgba(40, 53, 72, 0.4);
+  vertical-align: middle;
 }
 
-.xftp-table tr:hover td {
+.xftp-table tbody tr {
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.xftp-table tbody tr:hover td {
   background: rgba(56, 189, 248, 0.08);
 }
 
-.xftp-queue {
-  height: 84px;
+.xftp-table tbody tr.xftp-row-selected td {
+  background: rgba(56, 189, 248, 0.18);
+  color: #f8fafc;
+}
+
+.xftp-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.xftp-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xftp-icon {
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
-  overflow-y: auto;
+}
+
+.xftp-icon-dir {
+  color: #f59e0b;
+}
+
+.xftp-icon-code {
+  color: #38bdf8;
+}
+
+.xftp-icon-archive {
+  color: #a78bfa;
+}
+
+.xftp-icon-config {
+  color: #34d399;
+}
+
+.xftp-icon-file {
+  color: #94a3b8;
+}
+
+.xftp-size-col {
+  text-align: right !important;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  width: 78px;
+}
+
+.xftp-perms-col {
+  color: #64748b;
+  font-size: 11px;
+  white-space: nowrap;
+  width: 88px;
+}
+
+.xftp-check-col {
+  width: 26px;
+  text-align: center !important;
+}
+
+.xftp-empty {
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.xftp-queue-wrap {
+  flex-shrink: 0;
   border-top: 1px solid var(--border-subtle);
-  padding: 4px 10px;
   background: #0b1120;
+}
+
+.xftp-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.xftp-queue-header:hover {
+  color: var(--text-primary);
+}
+
+.xftp-queue {
+  max-height: 88px;
+  overflow-y: auto;
+  padding: 0 10px 6px;
+}
+
+.xftp-queue.collapsed {
+  display: none;
 }
 
 .queue-row {

@@ -112,6 +112,7 @@ export const desktopApi = {
     renameLocal: (oldPath: string, newPath: string) => SFTPHandler.RenameLocal(oldPath, newPath),
     deleteLocal: (path: string) => SFTPHandler.DeleteLocal(path),
     pickLocalFilesToUpload: async () => (await SFTPHandler.PickLocalFilesToUpload()) ?? [],
+    pickLocalFolderToUpload: () => SFTPHandler.PickLocalFolderToUpload(),
     pickLocalDirectory: () => SFTPHandler.PickLocalDirectory(),
     remoteWorkingDir: (sessionId: string) => SFTPHandler.RemoteWorkingDir(sessionId),
     listRemoteDir: async (sessionId: string, path: string) =>
@@ -124,6 +125,8 @@ export const desktopApi = {
       SFTPHandler.DeleteRemote(sessionId, path, recursive),
     startUpload: (sessionId: string, localFilePath: string, remoteDirPath: string) =>
       SFTPHandler.StartUpload(sessionId, localFilePath, remoteDirPath),
+    startUploadDirectory: (sessionId: string, localDirPath: string, remoteDirPath: string) =>
+      SFTPHandler.StartUploadDirectory(sessionId, localDirPath, remoteDirPath),
     startDownload: (sessionId: string, remoteFilePath: string, localDirPath: string) =>
       SFTPHandler.StartDownload(sessionId, remoteFilePath, localDirPath),
     cancelTransfer: (transferId: string) => SFTPHandler.CancelTransfer(transferId),

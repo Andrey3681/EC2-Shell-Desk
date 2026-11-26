@@ -705,13 +705,25 @@ async function mountWorkspace(): Promise<void> {
   const stageEl = rootEl.querySelector<HTMLElement>("#terminal-stage")!;
   const xftpEl = rootEl.querySelector<HTMLElement>("#xftp-panel")!;
 
-  xftpPane = new XftpDualPane(xftpEl);
+  const resolveSessionContextLabel = (sessionId: string): string => {
+    if (!sessionId) return "";
+    const hostId = terminalMgr?.getActiveHostId() ?? "";
+    const host = hosts.find((h) => h.id === hostId);
+    if (host) {
+      return `${host.alias} (${host.hostAddress})`;
+    }
+    return sessionId;
+  };
+
+  xftpPane = new XftpDualPane(xftpEl, () => {
+    xftpEl.style.display = "none";
+  });
   terminalMgr = new TerminalTabsManager(
     tabsBar,
     stageEl,
     (sessionId) => {
       if (xftpEl.style.display !== "none") {
-        void xftpPane?.setSession(sessionId);
+        void xftpPane?.setSession(sessionId, resolveSessionContextLabel(sessionId));
       }
       if (sidebarTab === "snippets") {
         const bodyEl = rootEl.querySelector<HTMLElement>("#sidebar-body");
@@ -723,7 +735,8 @@ async function mountWorkspace(): Promise<void> {
     (visible) => {
       xftpEl.style.display = visible ? "flex" : "none";
       if (visible) {
-        void xftpPane?.setSession(terminalMgr?.getActiveSessionId() ?? "");
+        const sid = terminalMgr?.getActiveSessionId() ?? "";
+        void xftpPane?.setSession(sid, resolveSessionContextLabel(sid));
       }
     }
   );
