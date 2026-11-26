@@ -207,3 +207,59 @@ func TestSFTPCancellationCleansUpPartialDownload(t *testing.T) {
 		t.Fatalf("expected partial local file %q to be deleted on cancel", localTarget)
 	}
 }
+
+func TestSFTPUploadDirRecursive(t *testing.T) {
+	ctx := context.Background()
+	remoteRoot := t.TempDir()
+	localRoot := t.TempDir()
+	client := startEmbeddedSFTPServer(t, remoteRoot)
+
+	// Build a local nested folder structure:
+	// deploy/
+	//   docker-compose.yml
+	//   empty_dir/
+	//   nginx/
+	//     default.conf
+	srcDir := filepath.Join(localRoot, "deploy")
+	if err := os.MkdirAll(filepath.Join(srcDir, "empty_dir"), 0o750); err != nil {
+		t.Fatalf("mkdir empty_dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(srcDir, "nginx"), 0o750); err != nil {
+		t.Fatalf("mkdir nginx: %v", err)
+	}
+
+	composeData := []byte("version: '3.8'\nservices:\n  web:\n    image: nginx\n")
+	nginxData := []byte("server { listen 80; }\n")
+	if err := os.WriteFile(filepath.Join(srcDir, "docker-compose.yml"), composeData, 0o600); err != nil {
+		t.Fatalf("write compose: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "nginx", "default.conf"), nginxData, 0o600); err != nil {
+		t.Fatalf("write nginx conf: %v", err)
+	}
+
+	expectedTotal := int64(len(composeData) + len(nginxData))
+	var lastTransferred, lastTotal int64
+	if err := client.UploadDir(ctx, srcDir, "app/deploy", func(transferred, total int64) {
+		lastTransferred = transferred
+		lastTotal = total
+	}); err != nil {
+		t.Fatalf("UploadDir() error = %v", err)
+	}
+
+	if lastTransferred != expectedTotal || lastTotal != expectedTotal {
+		t.Fatalf("progress = (%d, %d), want (%d, %d)", lastTransferred, lastTotal, expectedTotal, expectedTotal)
+	}
+
+	// Verify nested files and empty directory exist on remote server.
+	gotCompose, err := os.ReadFile(filepath.Join(remoteRoot, "app", "deploy", "docker-compose.yml"))
+	if err != nil || !bytes.Equal(gotCompose, composeData) {
+		t.Fatalf("remote compose = (%q, %v)", string(gotCompose), err)
+	}
+	gotNginx, err := os.ReadFile(filepath.Join(remoteRoot, "app", "deploy", "nginx", "default.conf"))
+	if err != nil || !bytes.Equal(gotNginx, nginxData) {
+		t.Fatalf("remote nginx = (%q, %v)", string(gotNginx), err)
+	}
+	if stat, err := os.Stat(filepath.Join(remoteRoot, "app", "deploy", "empty_dir")); err != nil || !stat.IsDir() {
+		t.Fatalf("expected empty_dir to exist on remote, stat=%v err=%v", stat, err)
+	}
+}

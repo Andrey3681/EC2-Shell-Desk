@@ -14,8 +14,10 @@ type SFTPClient interface {
 	WorkingDir(ctx context.Context) (string, error)
 	ListDir(ctx context.Context, remotePath string) ([]domain.FileEntry, error)
 	Upload(ctx context.Context, localPath, remotePath string, onProgress TransferProgressFunc) error
+	UploadDir(ctx context.Context, localDirPath, remoteTargetDir string, onProgress TransferProgressFunc) error
 	Download(ctx context.Context, remotePath, localPath string, onProgress TransferProgressFunc) error
 	Mkdir(ctx context.Context, remotePath string) error
+	MkdirAll(ctx context.Context, remotePath string) error
 	Rename(ctx context.Context, oldPath, newPath string) error
 	Remove(ctx context.Context, remotePath string, recursive bool) error
 	Close() error

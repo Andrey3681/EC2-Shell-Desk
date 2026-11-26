@@ -128,6 +128,146 @@ func (c *Client) Upload(ctx context.Context, localPath, remotePath string, onPro
 	return nil
 }
 
+type queuedUploadFile struct {
+	localPath  string
+	remotePath string
+	size       int64
+}
+
+// UploadDir recursively uploads a local directory and all its nested files to remoteTargetDir while reporting aggregated byte progress.
+func (c *Client) UploadDir(ctx context.Context, localDirPath, remoteTargetDir string, onProgress ports.TransferProgressFunc) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
+	cleanLocal, err := sanitizeLocalPath(localDirPath)
+	if err != nil {
+		return err
+	}
+	cleanRemote, err := sanitizeRemotePath(remoteTargetDir)
+	if err != nil {
+		return err
+	}
+
+	rootInfo, err := os.Stat(cleanLocal)
+	if err != nil {
+		return fmt.Errorf("stat local directory %q: %w", cleanLocal, err)
+	}
+	if !rootInfo.IsDir() {
+		return fmt.Errorf("%w: upload directory source is not a directory", domain.ErrInvalidInput)
+	}
+
+	dirs := make([]string, 0)
+	files := make([]queuedUploadFile, 0)
+	var totalBytes int64
+
+	walkErr := filepath.WalkDir(cleanLocal, func(currentPath string, d os.DirEntry, wErr error) error {
+		if wErr != nil {
+			return wErr
+		}
+		if ctxErr := checkContext(ctx); ctxErr != nil {
+			return ctxErr
+		}
+		rel, relErr := filepath.Rel(cleanLocal, currentPath)
+		if relErr != nil {
+			return fmt.Errorf("compute relative path for %q: %w", currentPath, relErr)
+		}
+		if rel == "." {
+			return nil
+		}
+		remoteEntryPath := path.Join(cleanRemote, filepath.ToSlash(rel))
+		if d.IsDir() {
+			dirs = append(dirs, remoteEntryPath)
+			return nil
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		info, infoErr := d.Info()
+		if infoErr != nil {
+			return fmt.Errorf("stat local entry %q: %w", currentPath, infoErr)
+		}
+		totalBytes += info.Size()
+		files = append(files, queuedUploadFile{
+			localPath:  currentPath,
+			remotePath: remoteEntryPath,
+			size:       info.Size(),
+		})
+		return nil
+	})
+	if walkErr != nil {
+		return fmt.Errorf("walk local directory %q: %w", cleanLocal, walkErr)
+	}
+
+	if onProgress != nil {
+		onProgress(0, totalBytes)
+	}
+
+	if err := c.sftp.MkdirAll(cleanRemote); err != nil {
+		return fmt.Errorf("create remote root directory %q: %w", cleanRemote, err)
+	}
+	for _, dirPath := range dirs {
+		if err := checkContext(ctx); err != nil {
+			return err
+		}
+		if err := c.sftp.MkdirAll(dirPath); err != nil {
+			return fmt.Errorf("create remote subdirectory %q: %w", dirPath, err)
+		}
+	}
+
+	var uploadedBefore int64
+	for _, f := range files {
+		if err := checkContext(ctx); err != nil {
+			return err
+		}
+		if err := c.uploadSingleInDir(ctx, f, uploadedBefore, totalBytes, onProgress); err != nil {
+			return err
+		}
+		uploadedBefore += f.size
+	}
+
+	if onProgress != nil {
+		onProgress(totalBytes, totalBytes)
+	}
+	return nil
+}
+
+func (c *Client) uploadSingleInDir(
+	ctx context.Context,
+	f queuedUploadFile,
+	uploadedBefore int64,
+	totalBytes int64,
+	onProgress ports.TransferProgressFunc,
+) error {
+	src, err := os.Open(f.localPath)
+	if err != nil {
+		return fmt.Errorf("open local file %q: %w", f.localPath, err)
+	}
+	defer func() {
+		_ = src.Close()
+	}()
+
+	dst, err := c.sftp.OpenFile(f.remotePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		return fmt.Errorf("open remote file %q: %w", f.remotePath, err)
+	}
+
+	copyErr := streamWithProgress(ctx, dst, src, f.size, func(fileBytes, _ int64) {
+		if onProgress != nil {
+			onProgress(uploadedBefore+fileBytes, totalBytes)
+		}
+	})
+	closeErr := dst.Close()
+
+	if copyErr != nil {
+		_ = c.sftp.Remove(f.remotePath)
+		return copyErr
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close remote upload file %q: %w", f.remotePath, closeErr)
+	}
+	return nil
+}
+
 // Download streams a remote file to localPath while reporting progress and cleaning up partial files on cancellation.
 func (c *Client) Download(ctx context.Context, remotePath, localPath string, onProgress ports.TransferProgressFunc) error {
 	if err := checkContext(ctx); err != nil {
@@ -192,6 +332,21 @@ func (c *Client) Mkdir(ctx context.Context, remotePath string) error {
 	}
 	if err := c.sftp.Mkdir(cleanPath); err != nil {
 		return fmt.Errorf("create remote directory %q: %w", cleanPath, err)
+	}
+	return nil
+}
+
+// MkdirAll creates a directory at remotePath along with any necessary parents.
+func (c *Client) MkdirAll(ctx context.Context, remotePath string) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
+	cleanPath, err := sanitizeRemotePath(remotePath)
+	if err != nil {
+		return err
+	}
+	if err := c.sftp.MkdirAll(cleanPath); err != nil {
+		return fmt.Errorf("create remote directories %q: %w", cleanPath, err)
 	}
 	return nil
 }
