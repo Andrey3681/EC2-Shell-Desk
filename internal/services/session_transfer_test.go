@@ -391,6 +391,23 @@ func TestSessionTOFUSSHAndSFTPEndToEnd(t *testing.T) {
 		t.Fatalf("downloaded file mismatch: err=%v", err)
 	}
 
+	// 3b. Recursive directory upload via TransferService.
+	localBundleDir := filepath.Join(localRoot, "bundle")
+	if err := os.MkdirAll(filepath.Join(localBundleDir, "nested"), 0o750); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(localBundleDir, "nested", "app.conf"), []byte("port=8080"), 0o600); err != nil {
+		t.Fatalf("write nested conf: %v", err)
+	}
+	dirTask, err := transferSvc.StartUploadDirectory(sess.SessionID, localBundleDir, "bundle")
+	if err != nil {
+		t.Fatalf("StartUploadDirectory: %v", err)
+	}
+	waitTransferDone(t, transferSink, dirTask.ID, domain.TransferCompleted)
+	if gotConf, err := os.ReadFile(filepath.Join(remoteRoot, "bundle", "nested", "app.conf")); err != nil || string(gotConf) != "port=8080" {
+		t.Fatalf("remote nested conf = (%q, %v)", string(gotConf), err)
+	}
+
 	// 4. Multi-user isolation: Bob logs in and cannot access Alice's session or transfer.
 	if _, err := authSvc.Login(ctx, "bob", "BobPass!2026"); err != nil {
 		t.Fatalf("Login(bob): %v", err)

@@ -22,6 +22,7 @@ type TransferEventSink interface {
 
 type managedTransfer struct {
 	task   domain.TransferTask
+	isDir  bool
 	cancel context.CancelFunc
 }
 
@@ -185,12 +186,17 @@ func (s *TransferService) DeleteRemote(ctx context.Context, sessionID, remotePat
 
 // StartUpload queues and executes an asynchronous cancelable file upload from localPath to remotePath.
 func (s *TransferService) StartUpload(sessionID, localPath, remotePath string) (domain.TransferTask, error) {
-	return s.startTransfer(sessionID, domain.TransferUpload, localPath, remotePath)
+	return s.startTransfer(sessionID, domain.TransferUpload, localPath, remotePath, false)
+}
+
+// StartUploadDirectory queues and executes an asynchronous cancelable recursive directory upload from localDirPath to remoteTargetDir.
+func (s *TransferService) StartUploadDirectory(sessionID, localDirPath, remoteTargetDir string) (domain.TransferTask, error) {
+	return s.startTransfer(sessionID, domain.TransferUpload, localDirPath, remoteTargetDir, true)
 }
 
 // StartDownload queues and executes an asynchronous cancelable file download from remotePath to localPath.
 func (s *TransferService) StartDownload(sessionID, remotePath, localPath string) (domain.TransferTask, error) {
-	return s.startTransfer(sessionID, domain.TransferDownload, localPath, remotePath)
+	return s.startTransfer(sessionID, domain.TransferDownload, localPath, remotePath, false)
 }
 
 // CancelTransfer cancels an active transfer task owned by the authenticated user.
@@ -248,6 +254,7 @@ func (s *TransferService) startTransfer(
 	sessionID string,
 	direction domain.TransferDirection,
 	localPath, remotePath string,
+	isDir bool,
 ) (domain.TransferTask, error) {
 	user, err := s.auth.CurrentUser()
 	if err != nil {
@@ -273,6 +280,7 @@ func (s *TransferService) startTransfer(
 
 	entry := &managedTransfer{
 		task:   task,
+		isDir:  isDir,
 		cancel: cancel,
 	}
 
@@ -306,7 +314,11 @@ func (s *TransferService) runTransfer(ctx context.Context, entry *managedTransfe
 
 	var transferErr error
 	if entry.task.Direction == domain.TransferUpload {
-		transferErr = sftpCli.Upload(ctx, entry.task.LocalPath, entry.task.RemotePath, onProgress)
+		if entry.isDir {
+			transferErr = sftpCli.UploadDir(ctx, entry.task.LocalPath, entry.task.RemotePath, onProgress)
+		} else {
+			transferErr = sftpCli.Upload(ctx, entry.task.LocalPath, entry.task.RemotePath, onProgress)
+		}
 	} else {
 		transferErr = sftpCli.Download(ctx, entry.task.RemotePath, entry.task.LocalPath, onProgress)
 	}

@@ -77,6 +77,17 @@ func (h *SFTPHandler) PickLocalDirectory() (string, error) {
 	return selected, nil
 }
 
+// PickLocalFolderToUpload opens a native Windows directory picker for recursive SFTP folder upload.
+func (h *SFTPHandler) PickLocalFolderToUpload() (string, error) {
+	selected, err := runtime.OpenDirectoryDialog(h.bridge.Context(), runtime.OpenDialogOptions{
+		Title: "Select Folder to Upload",
+	})
+	if err != nil {
+		return "", fmt.Errorf("open upload folder dialog: %w", err)
+	}
+	return selected, nil
+}
+
 // RemoteWorkingDir returns the initial remote working directory for an active SSH session.
 func (h *SFTPHandler) RemoteWorkingDir(sessionID string) (string, error) {
 	return h.transfers.RemoteWorkingDir(h.bridge.Context(), sessionID)
@@ -106,6 +117,12 @@ func (h *SFTPHandler) DeleteRemote(sessionID, remotePath string, recursive bool)
 func (h *SFTPHandler) StartUpload(sessionID, localFilePath, remoteDirPath string) (domain.TransferTask, error) {
 	remoteTarget := path.Join(remoteDirPath, filepath.Base(localFilePath))
 	return h.transfers.StartUpload(sessionID, localFilePath, remoteTarget)
+}
+
+// StartUploadDirectory queues a recursive SFTP upload of localDirPath into remoteDirPath.
+func (h *SFTPHandler) StartUploadDirectory(sessionID, localDirPath, remoteDirPath string) (domain.TransferTask, error) {
+	remoteTarget := path.Join(remoteDirPath, filepath.Base(localDirPath))
+	return h.transfers.StartUploadDirectory(sessionID, localDirPath, remoteTarget)
 }
 
 // StartDownload queues an SFTP download of remoteFilePath into localDirPath.
