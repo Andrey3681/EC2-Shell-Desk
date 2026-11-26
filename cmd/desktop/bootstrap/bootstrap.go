@@ -13,6 +13,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
 	"ec2-shell-desk/internal/adapters/crypto"
+	"ec2-shell-desk/internal/adapters/httpprobe"
 	"ec2-shell-desk/internal/adapters/sftpclient"
 	"ec2-shell-desk/internal/adapters/sqlite"
 	"ec2-shell-desk/internal/adapters/sshclient"
@@ -55,6 +56,7 @@ func Run(assets fs.FS) error {
 
 	sshManager := sshclient.NewManager(sftpclient.NewFromSSHClient)
 	localFS := winfs.NewWinFS()
+	healthProber := httpprobe.NewProber(0)
 	bridge := app.NewEventBridge()
 
 	authSvc := services.NewAuthService(userRepo, vaultCrypto, vaultCrypto)
@@ -64,7 +66,7 @@ func Run(assets fs.FS) error {
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, localFS, bridge)
 	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshManager, bridge)
 	snippetSvc := services.NewSnippetService(authSvc, snippetRepo, hostRepo, groupRepo, sessionSvc)
-	obsSvc := services.NewObservabilityService(authSvc, hostRepo, knownRepo, serviceRepo, vaultSvc, sshManager, bridge)
+	obsSvc := services.NewObservabilityService(authSvc, hostRepo, knownRepo, serviceRepo, vaultSvc, sshManager, healthProber, bridge)
 
 	authHandler := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc, obsSvc)
 	keyHandler := app.NewKeyHandler(bridge, vaultSvc)

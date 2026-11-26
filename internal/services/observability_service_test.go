@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"ec2-shell-desk/internal/adapters/httpprobe"
 	"ec2-shell-desk/internal/adapters/sqlite"
 	"ec2-shell-desk/internal/adapters/sshclient"
 	"ec2-shell-desk/internal/core/domain"
@@ -64,7 +65,7 @@ func TestObservabilityServiceLifecycleHealthAndIsolation(t *testing.T) {
 
 	sink := &spyServiceSink{}
 	sshMgr := sshclient.NewManager(nil, sshclient.WithDialTimeout(5*time.Second))
-	obsSvc := services.NewObservabilityService(authSvc, hostRepo, knownRepo, serviceRepo, vaultSvc, sshMgr, sink)
+	obsSvc := services.NewObservabilityService(authSvc, hostRepo, knownRepo, serviceRepo, vaultSvc, sshMgr, httpprobe.NewProber(2*time.Second), sink)
 	t.Cleanup(obsSvc.CloseAll)
 
 	if _, err := authSvc.BootstrapInitialUser(ctx, "alice", "AlicePass!2026"); err != nil {

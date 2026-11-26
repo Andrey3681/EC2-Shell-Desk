@@ -2,10 +2,8 @@ package services
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,20 +15,26 @@ import (
 	"ec2-shell-desk/internal/core/ports"
 )
 
+const (
+	httpStatusBadRequest   = 400
+	httpStatusUnauthorized = 401
+)
+
 // SaveServiceInput captures fields required to create or update a private web service.
 type SaveServiceInput struct {
-	ID         string                 `json:"id,omitempty"`
-	HostID     string                 `json:"hostId"`
-	Name       string                 `json:"name"`
-	Preset     domain.ServicePreset   `json:"preset"`
-	Protocol   domain.ServiceProtocol `json:"protocol"`
-	RemoteHost string                 `json:"remoteHost"`
-	RemotePort int                    `json:"remotePort"`
-	BasePath   string                 `json:"basePath"`
-	LocalPort  int                    `json:"localPort"`
-	HealthPath string                 `json:"healthPath"`
-	OpenMode   domain.ServiceOpenMode `json:"openMode"`
-	Notes      string                 `json:"notes"`
+	ID               string                 `json:"id,omitempty"`
+	HostID           string                 `json:"hostId"`
+	Name             string                 `json:"name"`
+	Preset           domain.ServicePreset   `json:"preset"`
+	Protocol         domain.ServiceProtocol `json:"protocol"`
+	RemoteHost       string                 `json:"remoteHost"`
+	RemotePort       int                    `json:"remotePort"`
+	BasePath         string                 `json:"basePath"`
+	LocalPort        int                    `json:"localPort"`
+	HealthPath       string                 `json:"healthPath"`
+	OpenMode         domain.ServiceOpenMode `json:"openMode"`
+	AllowInsecureTLS bool                   `json:"allowInsecureTls"`
+	Notes            string                 `json:"notes"`
 }
 
 // ServiceEventSink notifies the UI about runtime changes to a service's tunnel and health status.
@@ -53,6 +57,7 @@ type ObservabilityService struct {
 	services   ports.ServiceRepository
 	vault      *VaultService
 	sshManager ports.SSHSessionManager
+	prober     ports.HealthProber
 	sink       ServiceEventSink
 
 	mu     sync.RWMutex
@@ -67,6 +72,7 @@ func NewObservabilityService(
 	services ports.ServiceRepository,
 	vault *VaultService,
 	sshManager ports.SSHSessionManager,
+	prober ports.HealthProber,
 	sink ServiceEventSink,
 ) *ObservabilityService {
 	return &ObservabilityService{
@@ -76,6 +82,7 @@ func NewObservabilityService(
 		services:   services,
 		vault:      vault,
 		sshManager: sshManager,
+		prober:     prober,
 		sink:       sink,
 		active:     make(map[string]*runningService),
 	}
@@ -354,39 +361,27 @@ func (s *ObservabilityService) ProbeServiceHealth(ctx context.Context, serviceID
 		proto = string(domain.ServiceProtocolHTTP)
 	}
 	probeURL := fmt.Sprintf("%s://127.0.0.1:%d%s", proto, localPort, svc.NormalizedHealthPath())
-
-	client := &http.Client{
-		Timeout: 3 * time.Second,
-		Transport: &http.Transport{
-			// #nosec G402 -- health probe traverses an authenticated SSH loopback tunnel to internal/self-signed endpoints.
-			TLSClientConfig: &tls.Config{
-				MinVersion:         tls.VersionTLS12,
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
 	now := time.Now().UTC()
-	if err != nil {
-		return s.updateHealth(trimmedID, user.ID, domain.ServiceHealthUnhealthy, 0, 0, err.Error(), now), nil
+
+	if s.prober == nil {
+		return s.updateHealth(trimmedID, user.ID, domain.ServiceHealthUnhealthy, 0, 0, "health prober is not configured", now), nil
 	}
 
-	start := time.Now()
-	resp, err := client.Do(req)
-	latency := time.Since(start).Milliseconds()
-	if err != nil {
-		return s.updateHealth(trimmedID, user.ID, domain.ServiceHealthUnhealthy, 0, latency, err.Error(), now), nil
+	probeRes, probeErr := s.prober.Probe(ctx, ports.HealthProbeRequest{
+		URL:              probeURL,
+		AllowInsecureTLS: svc.AllowInsecureTLS,
+	})
+	if probeErr != nil {
+		return s.updateHealth(trimmedID, user.ID, domain.ServiceHealthUnhealthy, 0, probeRes.LatencyMs, probeErr.Error(), now), nil
 	}
-	_ = resp.Body.Close()
 
 	healthStatus := domain.ServiceHealthHealthy
-	if resp.StatusCode >= 400 && resp.StatusCode != http.StatusUnauthorized {
-		// 401 Unauthorized is common for Grafana when unauthenticated, but indicates service is up and healthy
+	if probeRes.HTTPStatus >= httpStatusBadRequest && probeRes.HTTPStatus != httpStatusUnauthorized {
+		// 401 Unauthorized is common for Grafana when unauthenticated, but indicates the service is up.
 		healthStatus = domain.ServiceHealthDegraded
 	}
 
-	return s.updateHealth(trimmedID, user.ID, healthStatus, resp.StatusCode, latency, "", now), nil
+	return s.updateHealth(trimmedID, user.ID, healthStatus, probeRes.HTTPStatus, probeRes.LatencyMs, "", now), nil
 }
 
 func (s *ObservabilityService) updateHealth(
@@ -526,18 +521,19 @@ func normalizeServiceInput(input SaveServiceInput) domain.PrivateService {
 	}
 
 	return domain.PrivateService{
-		ID:         strings.TrimSpace(input.ID),
-		HostID:     strings.TrimSpace(input.HostID),
-		Name:       strings.TrimSpace(input.Name),
-		Preset:     preset,
-		Protocol:   protocol,
-		RemoteHost: remoteHost,
-		RemotePort: input.RemotePort,
-		BasePath:   strings.TrimSpace(input.BasePath),
-		LocalPort:  input.LocalPort,
-		HealthPath: strings.TrimSpace(input.HealthPath),
-		OpenMode:   openMode,
-		Notes:      strings.TrimSpace(input.Notes),
+		ID:               strings.TrimSpace(input.ID),
+		HostID:           strings.TrimSpace(input.HostID),
+		Name:             strings.TrimSpace(input.Name),
+		Preset:           preset,
+		Protocol:         protocol,
+		RemoteHost:       remoteHost,
+		RemotePort:       input.RemotePort,
+		BasePath:         strings.TrimSpace(input.BasePath),
+		LocalPort:        input.LocalPort,
+		HealthPath:       strings.TrimSpace(input.HealthPath),
+		OpenMode:         openMode,
+		AllowInsecureTLS: protocol == domain.ServiceProtocolHTTPS && input.AllowInsecureTLS,
+		Notes:            strings.TrimSpace(input.Notes),
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"ec2-shell-desk/internal/adapters/crypto"
+	"ec2-shell-desk/internal/adapters/httpprobe"
 	"ec2-shell-desk/internal/adapters/sftpclient"
 	"ec2-shell-desk/internal/adapters/sqlite"
 	"ec2-shell-desk/internal/adapters/sshclient"
@@ -72,7 +73,7 @@ func TestHandlersAuthVaultHostAndLocalFS(t *testing.T) {
 	transferSvc := services.NewTransferService(authSvc, sessionSvc, winfs.NewWinFS(), bridge)
 	tunnelSvc := services.NewTunnelService(authSvc, hostRepo, knownRepo, tunnelRepo, vaultSvc, sshMgr, bridge)
 	snippetSvc := services.NewSnippetService(authSvc, snippetRepo, hostRepo, groupRepo, sessionSvc)
-	obsSvc := services.NewObservabilityService(authSvc, hostRepo, knownRepo, serviceRepo, vaultSvc, sshMgr, bridge)
+	obsSvc := services.NewObservabilityService(authSvc, hostRepo, knownRepo, serviceRepo, vaultSvc, sshMgr, httpprobe.NewProber(0), bridge)
 
 	authH := app.NewAuthHandler(bridge, authSvc, sessionSvc, transferSvc, tunnelSvc, obsSvc)
 	keyH := app.NewKeyHandler(bridge, vaultSvc)
